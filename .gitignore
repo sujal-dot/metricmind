@@ -12,6 +12,7 @@ build/
 dist/
 .virtualenv/
 venv/
+.venv/
 ENV/
 .pytest_cache/
 .coverage

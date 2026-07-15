@@ -27,8 +27,13 @@ app.include_router(health_router, prefix="/api/v1", tags=["health"])
 @app.get("/")
 async def root():
     return {
-        "name": "MetricMind API",
-        "version": "0.1.0",
-        "environment": settings.environment
+        "message": "MetricMind Backend Running"
+    }
+
+
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy"
     }
 
