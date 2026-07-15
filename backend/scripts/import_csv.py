@@ -14,7 +14,6 @@ import pandas as pd
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
 
 # Configure logging
 LOG_DIR = Path(__file__).parent.parent / "logs"
@@ -38,15 +37,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://metricmind:metricmind@loc
 def get_engine() -> Engine:
     """Create and return SQLAlchemy engine."""
     return create_engine(DATABASE_URL)
-
-def snake_case(s: str) -> str:
-    """Convert string to snake_case."""
-    s = s.strip()
-    s = s.replace(" ", "_").replace("-", "_").replace(".", "_")
-    s = s.lower()
-    while "__" in s:
-        s = s.replace("__", "_")
-    return s
 
 def create_schema(engine: Engine) -> None:
     """Create database schema from SQL file."""
@@ -73,16 +63,15 @@ def check_imported(engine: Engine, file_name: str) -> bool:
         result = conn.execute(query, {"file_name": file_name})
         return result.fetchone() is not None
 
-def log_import(engine: Engine, file_name: str, table_name: str, rows_imported: int, status: str, notes: str = "") -> None:
+def log_import(engine: Engine, file_name: str, rows_imported: int, status: str, notes: str = "") -> None:
     """Log import to import_logs table."""
     query = text("""
-        INSERT INTO import_logs (file_name, table_name, imported_at, rows_imported, status, notes)
-        VALUES (:file_name, :table_name, CURRENT_TIMESTAMP, :rows_imported, :status, :notes)
+        INSERT INTO import_logs (file_name, imported_at, rows_imported, status, notes)
+        VALUES (:file_name, CURRENT_TIMESTAMP, :rows_imported, :status, :notes)
     """)
     with engine.connect() as conn:
         conn.execute(query, {
             "file_name": file_name,
-            "table_name": table_name,
             "rows_imported": rows_imported,
             "status": status,
             "notes": notes
@@ -98,146 +87,48 @@ def normalize_and_import(file_path: Path, engine: Engine) -> None:
         logger.info(f"File already imported: {file_name}, skipping")
         return
     
-    # Read CSV
+    # Load the CSV
     df = pd.read_csv(file_path, encoding="latin-1")
     logger.info(f"Read {len(df)} rows from {file_name}")
     
-    # Standardize column names
-    df.columns = [snake_case(col) for col in df.columns]
-    
-    # Clean and parse dates
-    df["order_date"] = pd.to_datetime(df["order_date"], format="%m/%d/%Y").dt.date
-    df["ship_date"] = pd.to_datetime(df["ship_date"], format="%m/%d/%Y").dt.date
-    
-    # Trim strings
-    for col in df.select_dtypes(include=["object"]).columns:
-        df[col] = df[col].astype(str).str.strip()
-        df[col] = df[col].replace("nan", pd.NA)
-    
-    # =====================================
-    # Step 1: Import lookup tables
-    # =====================================
-    
-    # 1.1 Regions
-    regions_df = df[["region"]].drop_duplicates().reset_index(drop=True)
-    regions_df.columns = ["region_name"]
-    regions_df.to_sql("regions", engine, if_exists="append", index=False, method="multi")
-    logger.info(f"Imported {len(regions_df)} regions")
-    
-    # Get region_ids
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT region_id, region_name FROM regions"))
-        region_map = {row[1]: row[0] for row in result}
-    
-    # 1.2 States
-    states_df = df[["state", "region"]].drop_duplicates().reset_index(drop=True)
-    states_df.columns = ["state_name", "region_name"]
-    states_df["region_id"] = states_df["region_name"].map(region_map)
-    states_df = states_df[["state_name", "region_id"]]
-    states_df.to_sql("states", engine, if_exists="append", index=False, method="multi")
-    logger.info(f"Imported {len(states_df)} states")
-    
-    # Get state_ids
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT state_id, state_name FROM states"))
-        state_map = {row[1]: row[0] for row in result}
-    
-    # 1.3 Cities
-    cities_df = df[["city", "state", "postal_code"]].drop_duplicates().reset_index(drop=True)
-    cities_df.columns = ["city_name", "state_name", "postal_code"]
-    cities_df["state_id"] = cities_df["state_name"].map(state_map)
-    cities_df = cities_df[["city_name", "state_id", "postal_code"]]
-    cities_df.to_sql("cities", engine, if_exists="append", index=False, method="multi")
-    logger.info(f"Imported {len(cities_df)} cities")
-    
-    # Get city_ids (composite key)
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT city_id, city_name, state_id, postal_code FROM cities"))
-        city_map = {(row[1], row[2], str(row[3])): row[0] for row in result}
-    
-    # 1.4 Segments
-    segments_df = df[["segment"]].drop_duplicates().reset_index(drop=True)
-    segments_df.columns = ["segment_name"]
-    segments_df.to_sql("segments", engine, if_exists="append", index=False, method="multi")
-    logger.info(f"Imported {len(segments_df)} segments")
-    
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT segment_id, segment_name FROM segments"))
-        segment_map = {row[1]: row[0] for row in result}
-    
-    # 1.5 Categories
-    categories_df = df[["category"]].drop_duplicates().reset_index(drop=True)
-    categories_df.columns = ["category_name"]
-    categories_df.to_sql("categories", engine, if_exists="append", index=False, method="multi")
-    logger.info(f"Imported {len(categories_df)} categories")
-    
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT category_id, category_name FROM categories"))
-        category_map = {row[1]: row[0] for row in result}
-    
-    # 1.6 Subcategories
-    subcategories_df = df[["sub_category", "category"]].drop_duplicates().reset_index(drop=True)
-    subcategories_df.columns = ["subcategory_name", "category_name"]
-    subcategories_df["category_id"] = subcategories_df["category_name"].map(category_map)
-    subcategories_df = subcategories_df[["subcategory_name", "category_id"]]
-    subcategories_df.to_sql("subcategories", engine, if_exists="append", index=False, method="multi")
-    logger.info(f"Imported {len(subcategories_df)} subcategories")
-    
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT subcategory_id, subcategory_name, category_id FROM subcategories"))
-        subcategory_map = {(row[1], row[2]): row[0] for row in result}
-    
-    # 1.7 Ship Modes
-    ship_modes_df = df[["ship_mode"]].drop_duplicates().reset_index(drop=True)
-    ship_modes_df.columns = ["ship_mode_name"]
-    ship_modes_df.to_sql("ship_modes", engine, if_exists="append", index=False, method="multi")
-    logger.info(f"Imported {len(ship_modes_df)} ship modes")
-    
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT ship_mode_id, ship_mode_name FROM ship_modes"))
-        ship_mode_map = {row[1]: row[0] for row in result}
-    
-    # =====================================
-    # Step 2: Import main tables
-    # =====================================
-    
-    # 2.1 Products
-    products_df = df[["product_id", "product_name", "sub_category", "category"]].drop_duplicates().reset_index(drop=True)
-    products_df["category_id"] = products_df["category"].map(category_map)
-    products_df["subcategory_id"] = products_df.apply(
-        lambda x: subcategory_map[(x["sub_category"], x["category_id"])], 
-        axis=1
-    )
-    products_df = products_df[["product_id", "product_name", "subcategory_id"]]
-    products_df.to_sql("products", engine, if_exists="append", index=False, method="multi")
-    logger.info(f"Imported {len(products_df)} products")
-    
-    # 2.2 Customers
-    customers_df = df[["customer_id", "customer_name", "segment", "city", "state", "postal_code"]].drop_duplicates().reset_index(drop=True)
-    customers_df["segment_id"] = customers_df["segment"].map(segment_map)
-    customers_df["state_id"] = customers_df["state"].map(state_map)
-    customers_df["city_id"] = customers_df.apply(
-        lambda x: city_map.get((x["city"], x["state_id"], str(x["postal_code"]))),
-        axis=1
-    )
-    customers_df = customers_df[["customer_id", "customer_name", "segment_id", "city_id"]]
+    # Step 1: Prepare and import customers
+    logger.info("Importing customers...")
+    customers_df = df[["Customer ID", "Customer Name", "Segment", "Country", "City", "State", "Postal Code", "Region"]].drop_duplicates()
+    customers_df.columns = [
+        "customer_id", "customer_name", "segment", "country", "city", "state", "postal_code", "region"
+    ]
     customers_df.to_sql("customers", engine, if_exists="append", index=False, method="multi")
     logger.info(f"Imported {len(customers_df)} customers")
     
-    # 2.3 Orders
-    orders_df = df[["row_id", "order_id", "order_date", "ship_date", "ship_mode", "customer_id"]].drop_duplicates().reset_index(drop=True)
-    orders_df["ship_mode_id"] = orders_df["ship_mode"].map(ship_mode_map)
-    orders_df = orders_df[["row_id", "order_id", "order_date", "ship_date", "ship_mode_id", "customer_id"]]
+    # Step 2: Prepare and import products
+    logger.info("Importing products...")
+    products_df = df[["Product ID", "Product Name", "Category", "Sub-Category"]].drop_duplicates()
+    products_df.columns = ["product_id", "product_name", "category", "sub_category"]
+    products_df.to_sql("products", engine, if_exists="append", index=False, method="multi")
+    logger.info(f"Imported {len(products_df)} products")
+    
+    # Step 3: Prepare and import orders (distinct order IDs)
+    logger.info("Importing orders...")
+    orders_df = df[["Order ID", "Order Date", "Ship Date", "Ship Mode", "Customer ID"]].drop_duplicates(subset=["Order ID"])
+    orders_df["Order Date"] = pd.to_datetime(orders_df["Order Date"], format="%m/%d/%Y").dt.date
+    orders_df["Ship Date"] = pd.to_datetime(orders_df["Ship Date"], format="%m/%d/%Y").dt.date
+    orders_df.columns = [
+        "order_id", "order_date", "ship_date", "ship_mode", "customer_id"
+    ]
     orders_df.to_sql("orders", engine, if_exists="append", index=False, method="multi")
     logger.info(f"Imported {len(orders_df)} orders")
     
-    # 2.4 Order Details (sales line items)
-    order_details_df = df[["row_id", "order_id", "product_id", "sales", "quantity", "discount", "profit"]]
+    # Step 4: Prepare and import order details
+    logger.info("Importing order details...")
+    order_details_df = df[["Row ID", "Order ID", "Product ID", "Sales", "Quantity", "Discount", "Profit"]]
+    order_details_df.columns = [
+        "row_id", "order_id", "product_id", "sales", "quantity", "discount", "profit"
+    ]
     order_details_df.to_sql("order_details", engine, if_exists="append", index=False, method="multi")
     logger.info(f"Imported {len(order_details_df)} order details")
     
     # Log success
-    log_import(engine, file_name, "all_tables", len(df), "success", "Full Superstore dataset imported and normalized")
+    log_import(engine, file_name, len(df), "success", "Full Superstore dataset imported and normalized")
     logger.info("All data imported successfully!")
 
 def main() -> None:

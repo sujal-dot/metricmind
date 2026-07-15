@@ -35,22 +35,7 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://metricmind:metricmind@localhost:5432/metricmind")
 
 # List of all tables in our schema
-ALL_TABLES = [
-    "regions", "states", "cities", "segments",
-    "categories", "subcategories", "products",
-    "ship_modes", "customers", "orders", "order_details"
-]
-
-# Define foreign key relationships for validation
-FOREIGN_KEYS = {
-    "states": [("region_id", "regions", "region_id")],
-    "cities": [("state_id", "states", "state_id")],
-    "customers": [("segment_id", "segments", "segment_id"), ("city_id", "cities", "city_id")],
-    "subcategories": [("category_id", "categories", "category_id")],
-    "products": [("subcategory_id", "subcategories", "subcategory_id")],
-    "orders": [("ship_mode_id", "ship_modes", "ship_mode_id"), ("customer_id", "customers", "customer_id")],
-    "order_details": [("order_id", "orders", "order_id"), ("product_id", "products", "product_id")]
-}
+ALL_TABLES = ["customers", "products", "orders", "order_details"]
 
 def get_engine() -> Engine:
     return create_engine(DATABASE_URL)
@@ -66,15 +51,12 @@ def count_db_rows(engine: Engine, table_name: str) -> int:
         logger.error(f"Failed to count rows in {table_name}: {e}")
         return -1
 
-def check_duplicates(engine: Engine, table_name: str, primary_keys: List[str]) -> int:
+def check_duplicates(engine: Engine, table_name: str, primary_key: str) -> int:
     """Check for duplicate primary keys in table."""
-    if not primary_keys:
-        return 0
-    pk_str = ", ".join(primary_keys)
     query = text(f"""
         SELECT COUNT(*) FROM (
-            SELECT {pk_str} FROM {table_name}
-            GROUP BY {pk_str}
+            SELECT {primary_key} FROM {table_name}
+            GROUP BY {primary_key}
             HAVING COUNT(*) > 1
         ) AS duplicates
     """)
@@ -86,26 +68,39 @@ def check_duplicates(engine: Engine, table_name: str, primary_keys: List[str]) -
         logger.error(f"Failed to check duplicates in {table_name}: {e}")
         return -1
 
-def check_foreign_keys(engine: Engine, table_name: str) -> Dict[str, int]:
-    """Check for missing foreign keys in table."""
+def check_foreign_keys(engine: Engine) -> Dict[str, int]:
+    """Check for missing foreign keys in tables."""
     fk_issues = {}
-    if table_name not in FOREIGN_KEYS:
-        return fk_issues
-    for fk_col, ref_table, ref_col in FOREIGN_KEYS[table_name]:
-        query = text(f"""
-            SELECT COUNT(*) FROM {table_name}
-            WHERE {fk_col} IS NOT NULL
-            AND {fk_col} NOT IN (SELECT {ref_col} FROM {ref_table})
-        """)
-        try:
-            with engine.connect() as conn:
-                result = conn.execute(query)
-                count = result.scalar()
-                if count > 0:
-                    fk_issues[f"{fk_col} -> {ref_table}.{ref_col}"] = count
-        except Exception as e:
-            logger.error(f"Failed to check FK {fk_col} in {table_name}: {e}")
-            fk_issues[f"{fk_col} -> {ref_table}.{ref_col}"] = -1
+    # Check orders.customer_id references customers.customer_id
+    query1 = text("""
+        SELECT COUNT(*) FROM orders
+        WHERE customer_id NOT IN (SELECT customer_id FROM customers)
+    """)
+    with engine.connect() as conn:
+        result = conn.execute(query1)
+        count = result.scalar()
+        if count > 0:
+            fk_issues["orders.customer_id"] = count
+    # Check order_details.order_id references orders.order_id
+    query2 = text("""
+        SELECT COUNT(*) FROM order_details
+        WHERE order_id NOT IN (SELECT order_id FROM orders)
+    """)
+    with engine.connect() as conn:
+        result = conn.execute(query2)
+        count = result.scalar()
+        if count > 0:
+            fk_issues["order_details.order_id"] = count
+    # Check order_details.product_id references products.product_id
+    query3 = text("""
+        SELECT COUNT(*) FROM order_details
+        WHERE product_id NOT IN (SELECT product_id FROM products)
+    """)
+    with engine.connect() as conn:
+        result = conn.execute(query3)
+        count = result.scalar()
+        if count > 0:
+            fk_issues["order_details.product_id"] = count
     return fk_issues
 
 def main() -> None:
@@ -131,47 +126,44 @@ def main() -> None:
     # 2. Check duplicates
     logger.info("\n--- Duplicate Check ---")
     primary_keys = {
-        "regions": ["region_id"],
-        "states": ["state_id"],
-        "cities": ["city_id"],
-        "segments": ["segment_id"],
-        "categories": ["category_id"],
-        "subcategories": ["subcategory_id"],
-        "products": ["product_id"],
-        "ship_modes": ["ship_mode_id"],
-        "customers": ["customer_id"],
-        "orders": ["row_id"],
-        "order_details": ["row_id"]
+        "customers": "customer_id",
+        "products": "product_id",
+        "orders": "order_id",
+        "order_details": "row_id"
     }
     for table in ALL_TABLES:
-        pks = primary_keys.get(table, [])
-        dup_count = check_duplicates(engine, table, pks)
+        pk = primary_keys[table]
+        dup_count = check_duplicates(engine, table, pk)
         validation_results["duplicates"][table] = dup_count
         if dup_count > 0:
-            logger.warning(f"{table}: {dup_count} duplicate record(s) found")
+            logger.warning(f"{table}: {dup_count} duplicate {pk} found")
         elif dup_count == 0:
-            logger.info(f"{table}: No duplicates found")
+            logger.info(f"{table}: No duplicates found for {pk}")
     
     # 3. Check foreign keys
     logger.info("\n--- Foreign Key Validation ---")
-    for table in ALL_TABLES:
-        issues = check_foreign_keys(engine, table)
-        validation_results["foreign_keys"][table] = issues
-        if issues:
-            for fk, count in issues.items():
-                if count > 0:
-                    logger.warning(f"{table}: {count} invalid {fk} reference(s)")
-        else:
-            logger.info(f"{table}: All foreign keys valid")
+    fk_issues = check_foreign_keys(engine)
+    validation_results["foreign_keys"] = fk_issues
+    if fk_issues:
+        for fk, count in fk_issues.items():
+            if count > 0:
+                logger.warning(f"{fk}: {count} invalid references found")
+    else:
+        logger.info("All foreign keys are valid")
     
     # 4. Summary
     logger.info("\n" + "=" * 60)
     logger.info("Validation Summary")
     logger.info("=" * 60)
     total_duplicates = sum(v for v in validation_results["duplicates"].values() if v > 0)
-    logger.info(f"Total duplicate records: {total_duplicates}")
-    total_fk_issues = sum(sum(v for v in table_issues.values() if v > 0) for table_issues in validation_results["foreign_keys"].values())
+    total_fk_issues = sum(validation_results["foreign_keys"].values()) if validation_results["foreign_keys"] else 0
+    logger.info(f"Total duplicates: {total_duplicates}")
     logger.info(f"Total foreign key issues: {total_fk_issues}")
+    if total_duplicates == 0 and total_fk_issues == 0:
+        logger.info("✅ All validation checks passed!")
+    else:
+        logger.warning("❌ Validation failed!")
+    
     logger.info("=" * 60)
     logger.info(f"Log file: {LOG_FILE}")
 
