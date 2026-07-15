@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+*.exe
+*.egg-info/
+.eggs/
+build/
+dist/
+.virtualenv/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Node
+node_modules/
+.next/
+out/
+.npm
+.yarn-integrity
+
+# Environment
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Docker
+docker-compose.override.yml
+.dockerignore
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+

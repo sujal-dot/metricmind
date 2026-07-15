@@ -1,0 +1,696 @@
+# Day 1 Plan – Project Setup for `metricmind-agentic-bi`
+
+The goal of Day 1 is **not to build features**, but to create a professional development environment that will be used throughout the project.
+
+**Estimated Time:** 5–8 hours
+
+---
+
+# Phase 1: Install Required Software (1–2 Hours)
+
+## 1. Install Git
+
+Download Git
+
+* Windows: [https://git-scm.com/downloads](https://git-scm.com/downloads)
+* Mac
+
+```bash
+brew install git
+```
+
+Verify
+
+```bash
+git --version
+```
+
+Expected
+
+```
+git version 2.xx.x
+```
+
+---
+
+## 2. Install Python
+
+Download Python 3.12+
+
+[https://python.org](https://python.org)
+
+Verify
+
+```bash
+python --version
+```
+
+or
+
+```bash
+python3 --version
+```
+
+Expected
+
+```
+Python 3.12.x
+```
+
+---
+
+## 3. Install Node.js
+
+Download LTS Version
+
+[https://nodejs.org](https://nodejs.org)
+
+Verify
+
+```bash
+node -v
+
+npm -v
+```
+
+Expected
+
+```
+v22.x.x
+
+10.x.x
+```
+
+---
+
+## 4. Install Docker Desktop
+
+Download
+
+[https://docker.com/products/docker-desktop](https://docker.com/products/docker-desktop)
+
+After installation
+
+Run
+
+```bash
+docker --version
+```
+
+and
+
+```bash
+docker compose version
+```
+
+---
+
+## 5. Install PostgreSQL
+
+Download
+
+[https://postgresql.org/download](https://postgresql.org/download)
+
+During installation
+
+Remember
+
+```
+Username
+
+postgres
+
+Password
+
+yourpassword
+```
+
+Port
+
+```
+5432
+```
+
+Install pgAdmin too.
+
+Verify
+
+```bash
+psql --version
+```
+
+---
+
+## 6. Install VS Code
+
+[https://code.visualstudio.com/](https://code.visualstudio.com/)
+
+Install Extensions
+
+* Python
+* Pylance
+* Docker
+* GitLens
+* Tailwind CSS IntelliSense
+* Prettier
+* ESLint
+* PostgreSQL
+* Thunder Client
+* Error Lens
+* Material Icon Theme
+
+---
+
+# Phase 2: Create GitHub Repository
+
+Go to GitHub
+
+Create New Repository
+
+Repository Name
+
+```
+metricmind-agentic-bi
+```
+
+Visibility
+
+```
+Public
+```
+
+Initialize with
+
+✅ README
+
+✅ .gitignore → Python
+
+Do NOT add License now.
+
+Clone
+
+```bash
+git clone https://github.com/YOUR_USERNAME/metricmind-agentic-bi.git
+```
+
+Open
+
+```bash
+cd metricmind-agentic-bi
+code .
+```
+
+---
+
+# Phase 3: Create Folder Structure
+
+Inside repository
+
+```
+metricmind-agentic-bi/
+
+│
+├── backend/
+│
+├── frontend/
+│
+├── cube/
+│
+├── dbt/
+│
+├── docs/
+│
+├── data/
+│
+├── .gitignore
+│
+├── README.md
+│
+└── docker-compose.yml
+```
+
+Create folders
+
+```bash
+mkdir backend frontend cube dbt docs data
+```
+
+---
+
+# Phase 4: Initialize Backend
+
+Move
+
+```bash
+cd backend
+```
+
+Create Virtual Environment
+
+Mac/Linux
+
+```bash
+python3 -m venv venv
+```
+
+Windows
+
+```bash
+python -m venv venv
+```
+
+Activate
+
+Mac
+
+```bash
+source venv/bin/activate
+```
+
+Windows
+
+```bash
+venv\Scripts\activate
+```
+
+Upgrade pip
+
+```bash
+pip install --upgrade pip
+```
+
+---
+
+Install Packages
+
+```bash
+pip install
+
+fastapi
+
+uvicorn
+
+langchain
+
+langchain-openai
+
+langchain-community
+
+groq
+
+openai
+
+pandas
+
+numpy
+
+sqlalchemy
+
+psycopg2-binary
+
+python-dotenv
+
+pydantic
+
+httpx
+
+```
+
+Save
+
+```bash
+pip freeze > requirements.txt
+```
+
+---
+
+Backend Structure
+
+```
+backend/
+
+app/
+
+api/
+
+models/
+
+services/
+
+agents/
+
+utils/
+
+config/
+
+main.py
+
+requirements.txt
+
+.env
+
+```
+
+Create
+
+```bash
+mkdir app
+mkdir app/api
+mkdir app/models
+mkdir app/services
+mkdir app/agents
+mkdir app/utils
+mkdir app/config
+```
+
+---
+
+Create
+
+```
+main.py
+```
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def root():
+    return {"message":"MetricMind Backend Running"}
+```
+
+Run
+
+```bash
+uvicorn main:app --reload
+```
+
+Visit
+
+```
+http://127.0.0.1:8000
+```
+
+Swagger
+
+```
+http://127.0.0.1:8000/docs
+```
+
+---
+
+# Phase 5: Initialize Frontend
+
+Go back
+
+```bash
+cd ..
+```
+
+Create Next.js App
+
+```bash
+npx create-next-app@latest frontend
+```
+
+Select
+
+```
+TypeScript
+
+Yes
+
+Tailwind
+
+Yes
+
+ESLint
+
+Yes
+
+App Router
+
+Yes
+
+src/
+
+No
+
+Turbopack
+
+Yes
+```
+
+Go
+
+```bash
+cd frontend
+```
+
+Run
+
+```bash
+npm run dev
+```
+
+Open
+
+```
+localhost:3000
+```
+
+---
+
+Install UI Libraries
+
+```bash
+npm install
+
+@tremor/react
+
+echarts
+
+echarts-for-react
+
+axios
+
+lucide-react
+
+react-query
+
+zod
+
+react-hook-form
+
+```
+
+---
+
+# Phase 6: Environment Variables
+
+Backend
+
+```
+backend/.env
+```
+
+Example:
+
+```env
+OPENAI_API_KEY=your_key_here
+GROQ_API_KEY=your_key_here
+DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/metricmind
+```
+
+> **Never commit `.env` files to GitHub.** Add them to `.gitignore`.
+
+Frontend
+
+```
+frontend/.env.local
+```
+
+```env
+NEXT_PUBLIC_API=http://localhost:8000
+```
+
+---
+
+# Phase 7: Initialize Database
+
+Open PostgreSQL
+
+Create Database
+
+```sql
+CREATE DATABASE metricmind;
+```
+
+Verify
+
+```sql
+\l
+```
+
+Should contain
+
+```
+metricmind
+```
+
+---
+
+# Phase 8: Create Docker Compose
+
+Create
+
+```
+docker-compose.yml
+```
+
+Example:
+
+```yaml
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: metricmind-db
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: metricmind
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+```
+
+Run
+
+```bash
+docker compose up -d
+```
+
+Check
+
+```bash
+docker ps
+```
+
+---
+
+# Phase 9: Git Ignore
+
+Root
+
+```
+.gitignore
+```
+
+Add
+
+```
+venv/
+
+node_modules/
+
+.env
+
+.env.local
+
+__pycache__/
+
+*.pyc
+
+.next/
+
+dist/
+
+coverage/
+
+.idea/
+
+.vscode/
+
+```
+
+---
+
+# Phase 10: First Git Commit
+
+```bash
+git status
+```
+
+```bash
+git add .
+```
+
+```bash
+git commit -m "Initial project setup"
+```
+
+```bash
+git push origin main
+```
+
+---
+
+# End-of-Day Verification Checklist
+
+Ensure all of the following work before moving to Day 2:
+
+| Task                                            | Status |
+| ----------------------------------------------- | ------ |
+| GitHub repository created                       | ☐      |
+| Repository cloned locally                       | ☐      |
+| Folder structure created                        | ☐      |
+| Python installed                                | ☐      |
+| Node.js installed                               | ☐      |
+| Docker installed                                | ☐      |
+| PostgreSQL installed                            | ☐      |
+| VS Code configured                              | ☐      |
+| FastAPI backend starts successfully             | ☐      |
+| Swagger UI opens (`http://127.0.0.1:8000/docs`) | ☐      |
+| Next.js app runs (`http://localhost:3000`)      | ☐      |
+| PostgreSQL database `metricmind` created        | ☐      |
+| Docker PostgreSQL container running             | ☐      |
+| `.env` files created and ignored                | ☐      |
+| First commit pushed to GitHub                   | ☐      |
+
+## Recommended Final Project Structure
+
+```
+metricmind-agentic-bi/
+├── backend/
+│   ├── app/
+│   │   ├── agents/
+│   │   ├── api/
+│   │   ├── config/
+│   │   ├── models/
+│   │   ├── services/
+│   │   ├── utils/
+│   │   └── main.py
+│   ├── requirements.txt
+│   └── .env
+├── frontend/
+├── dbt/
+├── cube/
+├── data/
+├── docs/
+├── docker-compose.yml
+├── .gitignore
+└── README.md
+```
+
+With this setup complete, you'll have a clean, production-style foundation for building **MetricMind Agentic BI** in the following days.
