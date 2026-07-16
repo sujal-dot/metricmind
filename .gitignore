@@ -52,6 +52,18 @@ docker-compose.override.yml
 # Logs
 *.log
 logs/
+backend/logs/
+
+# Data
+data/raw/all.csv
+data/raw/*.csv
+data/processed/*.csv
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Reports
+backend/reports/*.json
+backend/reports/*.md
 
 # OS
 .DS_Store
