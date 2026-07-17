@@ -61,9 +61,12 @@ metricmind/
 │   │   ├── validate_data.py      # Data validation script
 │   │   ├── clean_data.py         # Data cleaning pipeline
 │   │   ├── validate_clean_data.py # Validate cleaned data
-│   │   └── generate_report.py    # Generate cleaning report
+│   │   ├── generate_report.py    # Generate cleaning report
+│   │   ├── build_star_schema.py  # Build star schema for BI
+│   │   └── validate_star_schema.py # Validate star schema
 │   ├── sql/
-│   │   └── schema.sql            # Database schema
+│   │   ├── schema.sql            # Database schema (normalized)
+│   │   └── star_schema/          # Star schema SQL DDL files
 │   ├── logs/                     # Import/validation/cleaning logs
 │   ├── reports/                  # Cleaning and other reports
 │   ├── requirements.txt
@@ -173,6 +176,86 @@ The data cleaning pipeline processes raw sales data and produces a clean, standa
 - **Cleaning Logs**: `backend/logs/`
 - **Cleaning Report**: `backend/reports/cleaning_report.md`
 - **Metrics**: `backend/reports/cleaning_metrics.json`
+
+
+## Day 4: Star Schema for BI & OLAP
+
+### Overview
+Build a Kimball-style star schema optimized for BI and OLAP queries using the cleaned sales dataset.
+
+### Star Schema Design
+#### Fact Table
+- **`fact_sales`**:
+  - `sales_key` (PK, surrogate key): Unique identifier for each fact
+  - `order_id`: Order ID from source system
+  - `customer_key` (FK): References `dim_customer.customer_key`
+  - `product_key` (FK): References `dim_product.product_key`
+  - `date_key` (FK): References `dim_date.date_key`
+  - `region_key` (FK): References `dim_region.region_key`
+  - `employee_key` (FK, nullable): References `dim_employee.employee_key`
+  - `sales_amount`: Total sales amount
+  - `quantity`: Number of units sold
+  - `discount`: Discount applied
+  - `profit_amount`: Profit from sale
+
+#### Dimension Tables
+- **`dim_customer`**:
+  - `customer_key` (PK): Surrogate key
+  - `customer_id`: Customer ID
+  - `customer_name`: Customer's name
+  - `segment`: Customer segment
+  - `created_at`: Timestamp when record was inserted
+
+- **`dim_product`**:
+  - `product_key` (PK): Surrogate key
+  - `product_id`: Product ID
+  - `product_name`: Product name
+  - `category`: Product category
+  - `sub_category`: Product subcategory
+  - `created_at`: Timestamp when record was inserted
+
+- **`dim_date`**:
+  - `date_key` (PK): Integer key (YYYYMMDD)
+  - `full_date`: Full date
+  - `day_of_month`: Day of month
+  - `month`: Month number
+  - `month_name`: Month name
+  - `year`: Year
+  - `quarter`: Quarter
+  - `day_of_week`: Day of week
+  - `week_number`: ISO week number
+  - `is_weekend`: Boolean indicating weekend
+
+- **`dim_region`**:
+  - `region_key` (PK): Surrogate key
+  - `country`: Country
+  - `state`: State/province
+  - `city`: City
+  - `region`: Sales region
+  - `created_at`: Timestamp when record was inserted
+
+- **`dim_employee`** (for future use):
+  - `employee_key` (PK): Surrogate key
+  - `employee_id`: Employee ID
+  - `employee_name`: Employee name
+  - `department`: Department
+  - `created_at`: Timestamp when record was inserted
+
+
+### How to Build the Star Schema
+1. Ensure PostgreSQL is running and cleaned data is available in `data/processed/clean_sales.csv`
+2. Run the build script:
+   ```bash
+   cd backend
+   python scripts/build_star_schema.py
+   ```
+3. Validate the star schema:
+   ```bash
+   python scripts/validate_star_schema.py
+   ```
+
+### Schema Files
+All SQL DDL files for creating tables are located at `backend/sql/star_schema/`.
 
 
 ## Getting Started
