@@ -1,0 +1,20 @@
+
+version: 2
+
+sources:
+  - name: metricmind
+    database: metricmind
+    schema: public
+    tables:
+      - name: fact_sales
+        description: "Fact table containing sales transactions"
+      - name: dim_customer
+        description: "Dimension table for customer information"
+      - name: dim_product
+        description: "Dimension table for product information"
+      - name: dim_date
+        description: "Dimension table for date attributes"
+      - name: dim_region
+        description: "Dimension table for region information"
+      - name: dim_employee
+        description: "Dimension table for employee information"

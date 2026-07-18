@@ -1,0 +1,13 @@
+
+metricmind:
+  outputs:
+    dev:
+      type: postgres
+      host: localhost
+      user: metricmind
+      password: metricmind
+      port: 5433
+      dbname: metricmind
+      schema: public
+      threads: 1
+  target: dev
