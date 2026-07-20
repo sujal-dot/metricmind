@@ -20,13 +20,13 @@ dbt/
 └── profiles.yml          # Database connection profiles
 ```
 
-## Getting Started
+#### Getting Started
 
-### Prerequisites
+##### Prerequisites
 - dbt installed (dbt-core and dbt-postgres)
 - PostgreSQL database running (via docker-compose)
 
-### Run dbt
+##### Run dbt
 ```bash
 cd dbt/
 dbt debug --profiles-dir .          # Test connection
