@@ -1,10 +1,11 @@
-from pathlib import Path
+import os
+from functools import lru_cache
 from typing import Literal
 
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings
 
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+load_dotenv(".env")
 
 
 class Settings(BaseSettings):
@@ -13,13 +14,15 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
     database_url: str = "postgresql://metricmind:metricmind@localhost:5433/metricmind"
-    openai_api_key: str = ""
-    groq_api_key: str = ""
 
     class Config:
-        env_file = str(Path(__file__).resolve().parents[1] / ".env")
+        env_file = ".env"
         case_sensitive = False
 
 
-settings = Settings()
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
 
+
+settings = get_settings()

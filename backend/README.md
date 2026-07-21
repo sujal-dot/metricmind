@@ -1,49 +1,49 @@
 # MetricMind Backend
 
-## Setup
+## Overview
 
-1. Create and activate virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # Windows: venv\Scripts\activate
-   ```
+This backend exposes a FastAPI service for the MetricMind analytics platform. It connects to the existing PostgreSQL warehouse and exposes REST endpoints for sales and aggregated metrics.
 
-2. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Installation
 
-3. Configure environment variables:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your credentials (especially DATABASE_URL)
-   ```
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-4. Run the application:
-   ```bash
-   uvicorn app.main:app --reload
-   ```
+## Environment
 
-## API Documentation
+The application reads database settings from .env.
 
+## Run the backend
+
+```bash
+cd backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+## API Endpoints
+
+- GET / - health check root message
+- GET /sales - paginated sales rows from the warehouse fact table
+- GET /metrics - aggregated revenue, profit, order, and customer metrics
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
-## Data Warehouse
+## Example requests
 
-### Import Data
-Place CSV files in `../data/raw/`, then run:
 ```bash
-python scripts/import_csv.py
+curl http://localhost:8000/
+curl "http://localhost:8000/sales?limit=10&offset=0"
+curl http://localhost:8000/metrics
 ```
 
-### Validate Data
-After import, validate:
-```bash
-python scripts/validate_data.py
-```
+## Troubleshooting
 
-### Logs
-Logs are stored in `logs/` directory
+- If the database is unavailable, verify Docker is running and the PostgreSQL container is up.
+- If the app fails to start, ensure dependencies are installed and the environment file points to the right database URL.
+- Logs are written to backend/logs/backend.log.
 
 
