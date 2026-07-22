@@ -43,3 +43,14 @@ class PaginatedResponse(BaseModel, Generic[T]):
     total: int
     limit: int
     offset: int
+
+
+class BIQuestionRequest(BaseModel):
+    question: str = Field(..., json_schema_extra={"example": "What was the total revenue last month?"})
+
+
+class BIAnswerResponse(BaseModel):
+    question: str
+    answer: str
+    source: str
+    provider: str

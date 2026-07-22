@@ -1,11 +1,18 @@
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
+from langchain_core.messages import AIMessage
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+import app.main as main_module
+import app.api.routes as routes_module
 from app.main import app
+from app.agents.bi_agent import BIAgent
+from app.agents.llm_factory import LLMFactory
+from app.agents.prompts import BI_ANALYST_SYSTEM_PROMPT
 
 client = TestClient(app)
 
@@ -19,7 +26,32 @@ def test_root_endpoint():
 
 
 def test_sales_endpoint():
-    response = client.get("/sales", params={"limit": 5, "offset": 0})
+    original_service = routes_module.SalesService
+
+    class FakeSalesService:
+        def __init__(self, _db):
+            pass
+
+        def list_sales(self, limit: int = 100, offset: int = 0):
+            return (
+                [
+                    {
+                        "order_id": "CA-2014-100006",
+                        "sales": 120.5,
+                        "quantity": 2,
+                        "profit": 20.1,
+                        "discount": 0.0,
+                    }
+                ],
+                1,
+            )
+
+    routes_module.SalesService = FakeSalesService
+    try:
+        response = client.get("/sales", params={"limit": 5, "offset": 0})
+    finally:
+        routes_module.SalesService = original_service
+
     assert response.status_code == 200
     payload = response.json()
     assert "items" in payload
@@ -36,7 +68,25 @@ def test_sales_endpoint():
 
 
 def test_metrics_endpoint():
-    response = client.get("/metrics")
+    original_service = routes_module.MetricsService
+
+    class FakeMetricsService:
+        def get_metrics(self):
+            return {
+                "total_revenue": 1000.0,
+                "total_profit": 120.0,
+                "profit_margin": 0.12,
+                "total_orders": 20,
+                "total_customers": 10,
+                "average_order_value": 50.0,
+            }
+
+    routes_module.MetricsService = FakeMetricsService
+    try:
+        response = client.get("/metrics")
+    finally:
+        routes_module.MetricsService = original_service
+
     assert response.status_code == 200
     payload = response.json()
     expected_fields = [
@@ -49,3 +99,95 @@ def test_metrics_endpoint():
     ]
     for field in expected_fields:
         assert field in payload
+
+
+def test_system_prompt_forbids_sql_and_requires_cube():
+    assert "NEVER generate SQL" in BI_ANALYST_SYSTEM_PROMPT
+    assert "NEVER access PostgreSQL directly" in BI_ANALYST_SYSTEM_PROMPT
+    assert "Cube.dev" in BI_ANALYST_SYSTEM_PROMPT
+
+
+def test_llm_factory_rejects_unsupported_provider():
+    try:
+        LLMFactory.create_llm(provider="invalid")  # type: ignore[arg-type]
+    except ValueError as exc:
+        assert "Unsupported LLM provider" in str(exc)
+    else:
+        raise AssertionError("Expected ValueError for unsupported provider")
+
+
+class FakeToolAwareLLM:
+    def bind_tools(self, _tools):
+        return self
+
+    async def ainvoke(self, messages):
+        if any(getattr(message, "tool_call_id", None) for message in messages):
+            return AIMessage(content="Revenue last month was 125000. This came from Cube API analytics.")
+        return AIMessage(
+            content="",
+            tool_calls=[
+                {
+                    "name": "cube_query",
+                    "args": {
+                        "query": {
+                            "measures": ["FactSales.revenue"],
+                            "timeDimensions": [
+                                {"dimension": "DimDate.fullDate", "dateRange": "last month"}
+                            ],
+                        }
+                    },
+                    "id": "tool_call_1",
+                    "type": "tool_call",
+                }
+            ],
+        )
+
+
+class FakeCubeTool:
+    name = "cube_query"
+
+    async def ainvoke(self, args):
+        assert args["query"]["measures"] == ["FactSales.revenue"]
+        return '{"data":[{"FactSales.revenue":"125000"}]}'
+
+
+def test_bi_agent_uses_cube_tool_flow():
+    import asyncio
+
+    agent = BIAgent(llm_provider="groq", llm=FakeToolAwareLLM(), tools=[FakeCubeTool()])
+    response = asyncio.run(agent.ask("What was the total revenue last month?"))
+    assert response["source"] == "Cube API"
+    assert response["provider"] == "groq"
+    assert "125000" in response["answer"]
+    assert "SQL" not in response["answer"].upper()
+
+
+def test_ask_endpoint_returns_expected_json(monkeypatch):
+    async def fake_ask(question: str):
+        return {
+            "question": question,
+            "answer": "Revenue last month was 125000.",
+            "source": "Cube API",
+            "provider": "groq",
+        }
+
+    monkeypatch.setattr(main_module, "BIAgent", lambda: SimpleNamespace(ask=fake_ask))
+    response = client.post("/ask", json={"question": "What was the total revenue last month?"})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload == {
+        "question": "What was the total revenue last month?",
+        "answer": "Revenue last month was 125000.",
+        "source": "Cube API",
+        "provider": "groq",
+    }
+
+
+def test_ask_endpoint_handles_invalid_request(monkeypatch):
+    async def fake_ask(question: str):
+        raise ValueError("Invalid user request: question cannot be empty")
+
+    monkeypatch.setattr(main_module, "BIAgent", lambda: SimpleNamespace(ask=fake_ask))
+    response = client.post("/ask", json={"question": ""})
+    assert response.status_code == 400
+    assert "Invalid user request" in response.json()["detail"]

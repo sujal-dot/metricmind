@@ -2,7 +2,7 @@ import logging
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -12,10 +12,12 @@ from app.api.health import router as health_router
 from app.api.metrics import router as metrics_router
 from app.api.routes import router as routes_router
 from app.api.sales import router as sales_router
-from app.config import settings
+from app.agents.bi_agent import BIAgent
+from app.models.schemas import BIQuestionRequest, BIAnswerResponse
 from app.services.database import check_database_connection
 
-log_dir = Path("backend/logs")
+BASE_DIR = Path(__file__).resolve().parents[2]
+log_dir = BASE_DIR / "logs"
 log_dir.mkdir(parents=True, exist_ok=True)
 logging.basicConfig(
     level=logging.INFO,
@@ -48,6 +50,26 @@ app.include_router(routes_router, tags=["core"])
 app.include_router(sales_router, prefix="/api/v1", tags=["sales"])
 app.include_router(metrics_router, prefix="/api/v1", tags=["metrics"])
 app.include_router(health_router, prefix="/api/v1", tags=["health"])
+
+
+@app.post("/ask", response_model=BIAnswerResponse, tags=["BI Agent"])
+async def ask_question(request: BIQuestionRequest):
+    """
+    Ask a natural language business question to the BI Agent.
+    The agent will use Cube.dev to get data and return a business insight.
+    """
+    try:
+        agent = BIAgent()
+        return await agent.ask(request.question)
+    except ValueError as exc:
+        logger.warning("Invalid BI request: %s", exc)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        logger.exception("BI agent runtime failure")
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("Failed to process question")
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @app.middleware("http")
@@ -95,4 +117,3 @@ async def sqlalchemy_exception_handler(_: Request, exc: SQLAlchemyError):
 async def general_exception_handler(_: Request, exc: Exception):
     logger.exception("Unexpected exception: %s", exc)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
-
