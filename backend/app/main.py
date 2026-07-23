@@ -12,6 +12,7 @@ from app.api.health import router as health_router
 from app.api.metrics import router as metrics_router
 from app.api.routes import router as routes_router
 from app.api.sales import router as sales_router
+from app.api.semantic import router as semantic_router
 from app.agents.bi_agent import BIAgent
 from app.models.schemas import BIQuestionRequest, BIAnswerResponse
 from app.services.database import check_database_connection
@@ -50,6 +51,7 @@ app.include_router(routes_router, tags=["core"])
 app.include_router(sales_router, prefix="/api/v1", tags=["sales"])
 app.include_router(metrics_router, prefix="/api/v1", tags=["metrics"])
 app.include_router(health_router, prefix="/api/v1", tags=["health"])
+app.include_router(semantic_router)
 
 
 @app.post("/ask", response_model=BIAnswerResponse, tags=["BI Agent"])
