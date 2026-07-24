@@ -1,3 +1,9 @@
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
+export interface JsonObject {
+  [key: string]: JsonValue;
+}
+
 export interface MetricsResponse {
   total_revenue: number;
   total_profit: number;
@@ -40,8 +46,8 @@ export interface SemanticSearchRequest {
 export interface SemanticSearchIntent {
   metrics: string[];
   dimensions: string[];
-  time_period: Record<string, any> | null;
-  filters: Record<string, any>;
+  time_period: JsonObject | null;
+  filters: JsonObject;
   ordering: Record<string, string> | null;
   limit: number | null;
 }
@@ -49,7 +55,7 @@ export interface SemanticSearchIntent {
 export interface SemanticSearchResponse {
   question: string;
   intent: SemanticSearchIntent;
-  cube_response: Record<string, any>;
+  cube_response: JsonObject;
   explanation: string;
   provider: string;
 }

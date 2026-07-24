@@ -1,8 +1,10 @@
 'use client';
 
+import type { EChartsOption } from 'echarts';
+
 import AnalyticsChart from '@/components/AnalyticsChart';
 
-const monthlyRevenueOptions = {
+const monthlyRevenueOptions: EChartsOption = {
   tooltip: {
     trigger: 'axis',
   },
@@ -32,7 +34,7 @@ const monthlyRevenueOptions = {
   ],
 };
 
-const profitTrendOptions = {
+const profitTrendOptions: EChartsOption = {
   tooltip: {
     trigger: 'axis',
   },
@@ -58,7 +60,7 @@ const profitTrendOptions = {
   ],
 };
 
-const salesByRegionOptions = {
+const salesByRegionOptions: EChartsOption = {
   tooltip: {
     trigger: 'item',
   },
@@ -84,7 +86,7 @@ const salesByRegionOptions = {
   ],
 };
 
-const salesByCategoryOptions = {
+const salesByCategoryOptions: EChartsOption = {
   tooltip: {
     trigger: 'axis',
     axisPointer: {
@@ -109,7 +111,7 @@ const salesByCategoryOptions = {
   ],
 };
 
-const topCustomersOptions = {
+const topCustomersOptions: EChartsOption = {
   tooltip: {
     trigger: 'axis',
     axisPointer: {

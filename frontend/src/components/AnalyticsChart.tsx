@@ -1,16 +1,16 @@
 'use client';
 
+import type { EChartsOption } from 'echarts';
 import ReactECharts from 'echarts-for-react';
-import { Card } from '@tremor/react';
 
 interface AnalyticsChartProps {
   title?: string;
-  options: any;
+  options: EChartsOption;
 }
 
 export default function AnalyticsChart({ title, options }: AnalyticsChartProps) {
   return (
-    <Card className="p-6">
+    <div className="bg-white p-6 rounded-xl border border-gray-200">
       {title && <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>}
       <ReactECharts
         option={options}
@@ -18,6 +18,6 @@ export default function AnalyticsChart({ title, options }: AnalyticsChartProps) 
         notMerge={true}
         lazyUpdate={true}
       />
-    </Card>
+    </div>
   );
 }

@@ -1,7 +1,5 @@
 'use client';
 
-import { Card, Text } from '@tremor/react';
-
 interface StatCardProps {
   title: string;
   value: string | number;
@@ -20,15 +18,15 @@ export default function StatCard({
   description,
 }: StatCardProps) {
   return (
-    <Card className="p-6">
+    <div className="bg-white p-6 rounded-xl border border-gray-200">
       <div className="flex items-center justify-between mb-2">
-        <Text className="text-gray-500 font-medium">{title}</Text>
+        <p className="text-gray-600 font-medium">{title}</p>
         {icon && <div className="text-gray-400">{icon}</div>}
       </div>
-      <Text className="text-3xl font-bold text-gray-900 mb-2">{value}</Text>
+      <p className="text-3xl font-bold text-gray-900 mb-2">{value}</p>
       {trend && trendValue && (
         <div className="flex items-center gap-1">
-          <Text
+          <p
             className={`text-sm ${
               trend === 'up'
                 ? 'text-green-600'
@@ -38,12 +36,10 @@ export default function StatCard({
             }`}
           >
             {trend === 'up' ? '↑' : trend === 'down' ? '↓' : ''} {trendValue}
-          </Text>
+          </p>
         </div>
       )}
-      {description && (
-        <Text className="text-sm text-gray-500 mt-1">{description}</Text>
-      )}
-    </Card>
+      {description && <p className="text-sm text-gray-500 mt-1">{description}</p>}
+    </div>
   );
 }

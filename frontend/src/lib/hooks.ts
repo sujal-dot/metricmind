@@ -3,9 +3,7 @@ import { api } from './api';
 import type {
   MetricsResponse,
   SalesListResponse,
-  BIQuestionRequest,
   BIAnswerResponse,
-  SemanticSearchRequest,
   SemanticSearchResponse,
 } from '@/types/api';
 
