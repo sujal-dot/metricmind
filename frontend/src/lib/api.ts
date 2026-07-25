@@ -19,8 +19,12 @@ const apiClient = axios.create({
 export const api = {
   getHealth: async () => apiClient.get('/'),
 
-  getMetrics: async (): Promise<MetricsResponse> => {
-    const response = await apiClient.get('/api/v1/metrics');
+  getMetrics: async <F extends Record<string, string | undefined>>(
+    filters?: F
+  ): Promise<MetricsResponse> => {
+    const response = await apiClient.get('/api/v1/metrics', {
+      params: filters,
+    });
     return response.data;
   },
 

@@ -7,10 +7,10 @@ import type {
   SemanticSearchResponse,
 } from '@/types/api';
 
-export function useMetrics() {
+export function useMetrics<F extends Record<string, string | undefined>>(filters?: F) {
   return useQuery<MetricsResponse, Error>({
-    queryKey: ['metrics'],
-    queryFn: api.getMetrics,
+    queryKey: ['metrics', filters],
+    queryFn: () => api.getMetrics(filters),
     refetchOnWindowFocus: false,
     staleTime: 60000,
   });
