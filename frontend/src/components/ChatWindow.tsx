@@ -5,6 +5,7 @@ import ChatInput from './ChatInput';
 import TypingIndicator from './TypingIndicator';
 import EmptyState from './EmptyState';
 import SidebarHistory from './SidebarHistory';
+import VisualizationMessage from './chat/VisualizationMessage';
 import type { ChatMessage as ChatMessageType } from '@/types/chat';
 import { useChat } from '@/hooks/useChat';
 
@@ -81,7 +82,15 @@ export default function ChatWindow() {
           ) : (
             <>
               {messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
+                <div key={message.id}>
+                  <ChatMessage message={message} />
+                  {message.role === 'assistant' && message.relatedQuestion ? (
+                    <VisualizationMessage
+                      userQuestion={message.relatedQuestion}
+                      assistantAnswer={message.content}
+                    />
+                  ) : null}
+                </div>
               ))}
               {isLoading && (
                 <>

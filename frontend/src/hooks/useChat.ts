@@ -17,15 +17,24 @@ function hydrateConversations(raw: string | null): Conversation[] {
     const parsed = JSON.parse(raw) as Array<{
       id: string;
       title: string;
-      messages: Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: string }>;
+      messages: Array<{
+        id: string;
+        role: 'user' | 'assistant';
+        content: string;
+        timestamp: string;
+        relatedQuestion?: string;
+      }>;
       createdAt: string;
       updatedAt: string;
     }>;
     return parsed.map((conversation) => ({
       ...conversation,
       messages: conversation.messages.map((message) => ({
-        ...message,
+        id: message.id,
+        role: message.role,
+        content: message.content,
         timestamp: new Date(message.timestamp),
+        relatedQuestion: message.relatedQuestion,
       })),
       createdAt: new Date(conversation.createdAt),
       updatedAt: new Date(conversation.updatedAt),
@@ -105,10 +114,11 @@ export function useChat() {
 
     setError(null);
 
+    const question = content.trim();
     const userMessage: ChatMessage = {
       id: `${Date.now()}`,
       role: 'user',
-      content: content.trim(),
+      content: question,
       timestamp: new Date(),
     };
     const conversationId = currentConversationId ?? `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -123,7 +133,7 @@ export function useChat() {
     setStreamingContent('');
 
     try {
-      const response = await api.askBI(content.trim());
+      const response = await api.askBI(question);
       const fullContent = response.answer;
       if (!fullContent.trim()) {
         throw new Error('The assistant returned an empty response.');
@@ -143,6 +153,7 @@ export function useChat() {
             role: 'assistant',
             content: fullContent,
             timestamp: new Date(),
+            relatedQuestion: question,
           };
           upsertConversation(conversationId, (conversation) => ({
             ...conversation,

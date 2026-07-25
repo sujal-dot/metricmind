@@ -59,6 +59,17 @@ src/
 │   │   ├── LineChart.tsx       # ECharts line chart (zoom, legend, gradient area)
 │   │   ├── BarChart.tsx        # ECharts bar chart (horizontal/vertical, hover effects)
 │   │   └── PieChart.tsx        # ECharts pie chart (interactive legend, percentage labels)
+│   ├── visualization/          # Day 14 dynamic visualization engine
+│   │   ├── IntentClassifier.ts # Keyword-based intent → chart classifier (trend/distribution/comparison/kpi)
+│   │   ├── VisualizationEngine.ts # Intent + Cube JSON → VisualizationPayload with demo datasets
+│   │   ├── ChartRouter.tsx     # Receives question; selects/renders Line/Bar/Pie/KPIs automatically
+│   │   ├── LineChart.tsx       # Memoized ECharts line chart for chat-embedded viz
+│   │   ├── BarChart.tsx        # Memoized ECharts bar chart for chat-embedded viz
+│   │   ├── PieChart.tsx        # Memoized ECharts pie chart for chat-embedded viz
+│   │   ├── KPICards.tsx        # 1–6 card responsive KPI grid for chat-embedded viz
+│   │   └── EmptyVisualization.tsx # Fallback when unsupported / empty / error
+│   ├── chat/
+│   │   └── VisualizationMessage.tsx # Renders ChartRouter (SSR-disabled dynamic) after AI responses
 │   ├── filters/
 │   │   ├── DateFilter.tsx      # Date range picker with preset shortcuts
 │   │   ├── RegionFilter.tsx    # Region dropdown selector
@@ -66,7 +77,7 @@ src/
 │   ├── Sidebar.tsx             # Sidebar navigation
 │   ├── Navbar.tsx              # Top navbar
 │   ├── StatCard.tsx            # Legacy KPI card
-│   ├── ChatWindow.tsx          # Chat interface with message history/streaming
+│   ├── ChatWindow.tsx          # Chat interface with message history/streaming + dynamic viz
 │   ├── ChatMessage.tsx         # Individual chat message with markdown
 │   ├── ChatInput.tsx           # Chat text input and send button
 │   ├── TypingIndicator.tsx     # AI typing indicator
@@ -80,12 +91,14 @@ src/
 ├── lib/
 │   ├── api.ts                  # Axios API client (with filter support on /metrics)
 │   ├── analyticsApi.ts         # Dedicated analytics API client
+│   ├── visualization.ts        # Re-exports: classifyIntent, buildVisualizationPayload, getChartLabel
 │   ├── chartUtils.ts           # Formatting utilities: currency, number, percent, colors
 │   └── hooks.ts                # TanStack Query hooks (useMetrics accepts filters)
 ├── types/
 │   ├── api.ts                  # TypeScript API types
 │   ├── analytics.ts            # TypeScript analytics types (KPIs, filters, chart data)
-│   └── chat.ts                 # TypeScript chat types
+│   ├── visualization.ts        # Day 14 types: DetectedIntent, ChartType, VisualizationPayload, + per-chart data
+│   └── chat.ts                 # TypeScript chat types (+ relatedQuestion for viz intent)
 └── providers.tsx               # TanStack Query provider
 ```
 
@@ -123,6 +136,95 @@ Each component is memoized via `useMemo` for the ECharts option object and uses 
 - Mobile: 1 column grids, stacked inputs, scrollable chart containers.
 - Tablet (sm/md): 2 column KPI grid, 1 column chart grid.
 - Desktop (lg/xl): 3 column KPI grid, 2 column chart grid (Top Products and Top Customers span both columns).
+
+## Dynamic Visualization (Day 14)
+
+The chat interface now includes an intelligent visualization engine that selects and renders
+the best chart for every assistant response based on the user's natural language question.
+
+### Pipeline
+
+```
+User Question
+      |
+      v
+IntentClassifier (keyword-based)
+      |
+      v
+DetectedIntent (comparisonType + metrics + dimensions + timePeriod + confidence)
+      |
+      v
+VisualizationEngine.build (Cube JSON -> VisualizationPayload)
+      |
+      v
+ChartRouter (renders Line / Bar / Pie / KPI cards)
+      |
+      v
+Appears below every AI answer inside the chat.
+```
+
+### Intent-to-Chart Mapping
+
+| Intent | Keywords | Chart | Example Queries |
+|---|---|---|---|
+| Trend (trend) | trend, growth, over time, monthly, yearly, daily, timeline, compare months/years | **Line Chart** | "Show monthly revenue trend for 2025", "Customer growth over time", "Profit over time" |
+| Comparison (comparison) | region, category, product, customer, top, ranking, compare, highest, lowest, best, best-selling | **Bar Chart** | "Sales by region", "Top 10 customers", "Best-selling products", "Profit by category" |
+| Distribution (distribution) | share, percentage, distribution, composition, contribution, breakdown, proportion, mix, market share | **Pie Chart** | "Revenue share by category", "Profit distribution", "Market share" |
+| KPI (kpi) | total revenue, total profit, total orders, customers, average order value, aov, margin, kpi, totals | **KPI Cards** | "Total profit", "How many customers do we have?", "Show me the totals", "Average order value" |
+
+### Core Files
+
+- `components/visualization/IntentClassifier.ts`
+  - Exports `classifyIntent(question) -> DetectedIntent`.
+  - Keyword scoring across 4 buckets: trend, comparison, distribution, kpi.
+  - Extracts metrics, dimensions, and timePeriod via regex patterns.
+  - Returns `confidence` plus the highest-scoring chart type.
+  - Supports future chart types: add a new keyword list, then map it inside `buildVisualizationPayload`.
+- `components/visualization/VisualizationEngine.ts`
+  - Exports `buildVisualizationPayload(question, cubeResponse, fallbackDemo)`.
+  - Selects demo datasets (region/category/product/customer/kpi subsets) based on the detected intent.
+  - Pluggable: swap demo datasets for live Cube JSON payloads without touching the classifier.
+- `components/visualization/ChartRouter.tsx`
+  - `useMemo` over (question + cubeResponse) -> VisualizationPayload.
+  - Shows a route badge (Line/Bar/Pie/KPI) with confidence %, extracted metrics/dims, and time period.
+  - Switches render path based on `payload.chartType`.
+  - Falls back to `EmptyVisualization` with a friendly reason when the intent is unsupported.
+- `components/chat/VisualizationMessage.tsx`
+  - Uses `next/dynamic` with `ssr: false` because ECharts is browser-only (no window on server).
+  - Mounted from ChatWindow for every assistant message that carries a `relatedQuestion`.
+- `lib/visualization.ts`
+  - Public barrel: re-exports `classifyIntent`, `buildVisualizationPayload`, `getChartLabel`, and the core visualization types.
+
+### Chat Integration Flow
+
+1. `types/chat.ts` - `ChatMessage.relatedQuestion` optional field added.
+2. `hooks/useChat.ts` - `sendMessage()` stores the user's trimmed question into the assistant message as `relatedQuestion` when it's persisted. Hydration (localStorage roundtrip) also preserves `relatedQuestion`.
+3. `components/ChatWindow.tsx` - After each `ChatMessage` for `role: 'assistant'` with a `relatedQuestion`, a `VisualizationMessage` is rendered immediately below the AI response.
+
+### Supported Queries Verified
+
+All example queries from the spec produce the correct routing:
+
+1. "Show monthly revenue trend for 2025" -> Line Chart
+2. "Sales by region" -> Bar Chart
+3. "Revenue share by category" -> Pie Chart
+4. "Total profit" -> KPI Cards
+5. "Top 10 customers" -> Bar Chart
+6. "Profit distribution" -> Pie Chart
+7. "Customer growth over time" -> Line Chart
+
+### API Flow
+
+Backend endpoints remain unchanged: `/ask`, `/semantic-search`, `/api/v1/metrics`, `/api/v1/sales`. The visualization engine currently uses the user's question (`relatedQuestion`) for intent routing along with any Cube JSON returned by `/ask` or `/semantic-search`, with representative demo fallback datasets for consistent visualization output.
+
+### Error Handling & Performance
+
+- Empty / unsupported question -> EmptyVisualization (dashed border + descriptive fallback message).
+- Invalid JSON / missing chart data -> caught by the engine -> EmptyVisualization with a `reason` explaining the issue.
+- Network / backend unavailable -> surfaces via `useChat.error` as before; viz never crashes.
+- Lazy loading: `next/dynamic` with `ssr: false` defers ECharts bundle to browser runtime.
+- Memoized chart option objects + `notMerge={true}` + `lazyUpdate={true}` on echarts-for-react for minimal re-renders.
+- Responsive: Tailwind grid breakpoints on KPICards + percentage-width chart containers.
 
 ## Chat UI Features
 

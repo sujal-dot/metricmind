@@ -10,7 +10,6 @@ import PieChart from '@/components/charts/PieChart';
 import DateFilter from '@/components/filters/DateFilter';
 import RegionFilter from '@/components/filters/RegionFilter';
 import CategoryFilter from '@/components/filters/CategoryFilter';
-import LoadingCharts from '@/components/LoadingCharts';
 import { formatCurrency } from '@/lib/chartUtils';
 import type { AnalyticsFilters } from '@/types/analytics';
 
@@ -58,7 +57,6 @@ export default function AnalyticsPage() {
   const [dateTo, setDateTo] = useState('');
   const [region, setRegion] = useState('');
   const [category, setCategory] = useState('');
-  const [isFilterLoading, setIsFilterLoading] = useState(false);
 
   const filters = useMemo<AnalyticsFilters>(() => {
     const f: AnalyticsFilters = {};
@@ -77,10 +75,6 @@ export default function AnalyticsPage() {
     setRegion('');
     setCategory('');
   };
-
-  if (isFilterLoading) {
-    return <LoadingCharts />;
-  }
 
   return (
     <div className="space-y-6">
