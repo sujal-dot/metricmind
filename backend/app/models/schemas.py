@@ -54,6 +54,14 @@ class BIAnswerResponse(BaseModel):
     answer: str
     source: str
     provider: str
+    cube_trace: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Transparency payload rendered by the frontend View API button.",
+    )
+    cube_json: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Cube.dev JSON response rendered by the frontend View JSON button.",
+    )
 
 
 class SemanticSearchRequest(BaseModel):
@@ -77,6 +85,14 @@ class SemanticSearchResponse(BaseModel):
     cube_response: Dict[str, Any]
     explanation: str
     provider: str
+    cube_trace: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Transparency payload rendered by the frontend View API button.",
+    )
+    cube_json: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Cube.dev JSON response rendered by the frontend View JSON button.",
+    )
 
 
 class ExplainSummary(BaseModel):
@@ -132,4 +148,60 @@ class ExplainResponse(BaseModel):
     provider: str = Field(..., json_schema_extra={"example": "Groq"})
     data_source: str = Field("demo", json_schema_extra={"example": "cube_api"})
     narrative: Optional[str] = Field(None, json_schema_extra={"example": "Optional LLM synthesis text"})
+    cube_trace: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Transparency payload rendered by the frontend View API button.",
+    )
+    cube_json: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Cube.dev JSON response rendered by the frontend View JSON button.",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Governance / Transparency (Day 16)
+# ---------------------------------------------------------------------------
+class GovernanceValidationRequest(BaseModel):
+    question: str = Field(
+        ...,
+        json_schema_extra={"example": "SELECT * FROM Orders"},
+    )
+    route: Optional[str] = Field(
+        None,
+        json_schema_extra={"example": "/ask"},
+        description="Optional endpoint the question is targeted at, for logging.",
+    )
+
+
+class SecurityDecisionSchema(BaseModel):
+    allowed: bool
+    block_reason: Optional[str] = None
+    block_code: Optional[str] = None
+    suggested_filters: List[str] = Field(default_factory=list)
+    has_sql_injection: bool = False
+    has_sql_request: bool = False
+    is_expensive: bool = False
+    matched_reasons: List[str] = Field(default_factory=list)
+
+
+class GovernanceValidationResponse(BaseModel):
+    question: str
+    decision: SecurityDecisionSchema
+    cube_trace: Optional[Dict[str, Any]] = None
+    cube_json: Optional[Dict[str, Any]] = None
+
+
+class CubeTraceSchema(BaseModel):
+    """Schema the frontend reads for the View API / View JSON buttons.
+
+    All fields are redacted by the backend — no tokens or secrets leak here.
+    """
+
+    endpoint: str = Field(..., json_schema_extra={"example": "/cubejs-api/v1/load"})
+    method: str = Field(..., json_schema_extra={"example": "POST"})
+    request_payload: Dict[str, Any] = Field(default_factory=dict)
+    query_parameters: Dict[str, Any] = Field(default_factory=dict)
+    execution_time_ms: float = Field(..., json_schema_extra={"example": 245.18})
+    response_status: int = Field(..., json_schema_extra={"example": 200})
+    response_size_bytes: int = Field(..., json_schema_extra={"example": 3892})
 

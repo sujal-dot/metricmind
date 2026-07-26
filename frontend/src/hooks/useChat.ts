@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import type { ChatMessage, Conversation } from '@/types/chat';
+import type { SecurityDecision, CubeTrace, JsonObject } from '@/types/api';
 import { api } from '@/lib/api';
 
 const STORAGE_KEY = 'metricmind-chat-conversations';
@@ -23,6 +24,9 @@ function hydrateConversations(raw: string | null): Conversation[] {
         content: string;
         timestamp: string;
         relatedQuestion?: string;
+        cube_trace?: CubeTrace | null;
+        cube_json?: JsonObject | null;
+        policy_violation?: SecurityDecision | null;
       }>;
       createdAt: string;
       updatedAt: string;
@@ -30,11 +34,8 @@ function hydrateConversations(raw: string | null): Conversation[] {
     return parsed.map((conversation) => ({
       ...conversation,
       messages: conversation.messages.map((message) => ({
-        id: message.id,
-        role: message.role,
-        content: message.content,
+        ...message,
         timestamp: new Date(message.timestamp),
-        relatedQuestion: message.relatedQuestion,
       })),
       createdAt: new Date(conversation.createdAt),
       updatedAt: new Date(conversation.updatedAt),
@@ -129,10 +130,42 @@ export function useChat() {
       messages: [...conversation.messages, userMessage],
       updatedAt: new Date(),
     }));
+
     setIsLoading(true);
     setStreamingContent('');
 
     try {
+      // --- Day 16 governance pre-flight ---
+      let decision: SecurityDecision | null = null;
+      try {
+        const validation = await api.governanceValidate({ question, route: '/ask' });
+        decision = validation.decision;
+      } catch (validationErr) {
+        // If the governance endpoint is down, don't block the user — continue
+        // to the agent; the backend will validate again on the server.
+        decision = null;
+      }
+
+      if (decision && !decision.allowed) {
+        const blockedMessage: ChatMessage = {
+          id: `${Date.now() + 1}`,
+          role: 'assistant',
+          content:
+            'This request was blocked by the MetricMind governance policy before being sent to the analytics engine. See the details below.',
+          timestamp: new Date(),
+          relatedQuestion: question,
+          policy_violation: decision,
+        };
+        upsertConversation(conversationId, (conversation) => ({
+          ...conversation,
+          messages: [...conversation.messages, blockedMessage],
+          updatedAt: new Date(),
+        }));
+        setIsLoading(false);
+        setError(decision.block_reason ?? 'Request blocked by the governance policy.');
+        return;
+      }
+
       const response = await api.askBI(question);
       const fullContent = response.answer;
       if (!fullContent.trim()) {
@@ -154,6 +187,8 @@ export function useChat() {
             content: fullContent,
             timestamp: new Date(),
             relatedQuestion: question,
+            cube_trace: response.cube_trace ?? null,
+            cube_json: response.cube_json ?? null,
           };
           upsertConversation(conversationId, (conversation) => ({
             ...conversation,

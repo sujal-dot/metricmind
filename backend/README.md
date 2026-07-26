@@ -63,6 +63,75 @@ Intent → analysis pattern:
 | customers | Orders, retention cohorts, new-acquisition promos |
 | retention | Active customer drop, AOV / LTV signals, promo dependency |
 
+## Governance, Security & Query Transparency (Day 16)
+
+### Architecture
+
+```
+User Question
+   ↓
+Security Validator  ─── SQL injection ──► block
+   ↓
+SQL Detector         ─── Raw SQL requests ──► block + CUBE-ONLY msg
+   ↓
+Expensive Query Dt.  ─── Data-dump patterns ──► block + suggested filters
+   ↓
+Policy Engine         (decision + JSONL log)
+   ↓
+LangChain Agent / Explain Engine / Semantic Router
+   ↓
+Cube API ONLY  →  NEVER run raw SQL / NEVER bypass Cube.dev
+   ↓
+AI Explanation + cube_trace payload + cube_json payload
+   ↓
+Frontend renders:
+  ├─► View API button  (Cube API endpoint + payload + time + status + size)
+  └─► View JSON button (pretty-printed Cube.dev response + Copy + Expand/Collapse)
+```
+
+Every analytics endpoint (`/ask`, `/semantic-search`, `/explain`, plus the
+client-facing `/governance/validate` pre-flight check) enforces the Cube-only
+policy on the server. The chat UI also runs a pre-flight `/governance/validate`
+call so blocked questions never leave the browser.
+
+### Module map
+
+| File | Purpose |
+|---|---|
+| `app/governance/sql_detector.py` | 11 regex patterns (tautology, UNION SELECT, stacked queries, `SELECT *`, exfiltration, comment sequences) + 22 dangerous-DML keyword blocklist + 16 user-asks-for-SQL keyword blocklist → `SQLDetectionResult` |
+| `app/governance/expensive_query_detector.py` | 30+ data-dump phrases (every order, entire database, export all) + large-count regex + 10M-row phrases + NARROWING indicators to downgrade severity |
+| `app/governance/security_validator.py` | Composes the two detectors into one `SecurityDecision`. Precedence: SQL-injection → SQL-request → expensive |
+| `app/governance/query_guard.py` | "Only Cube API allowed" trace recorder; redacts secrets/tokens from payloads before rendering them as transparency |
+| `app/governance/policy_engine.py` | **Single public entrypoint**: `PolicyEngine.validate(question, route)` → `PolicyResult`, logs every decision via `GovernanceLogger` |
+| `app/governance/governance_logger.py` | Append-only JSONL at `logs/governance_events.jsonl` — events: `policy_decision`, `cube_trace`, `error` |
+| `app/governance/prompts.py` | `SECURITY_BLOCKED_MESSAGE`, `CUBE_ONLY_POLICY_MESSAGE`, `EXPENSIVE_QUERY_SUGGESTION_MESSAGE` constants |
+| `app/api/governance.py` | `POST /governance/validate` endpoint consumed by the chat UI pre-flight |
+
+### View API feature
+
+Displayed on every assistant message when the backend returned `cube_trace`.
+The modal shows:
+
+- Cube API endpoint (`/cubejs-api/v1/load`)
+- HTTP method (`POST`)
+- Request payload (user question, **redacted**)
+- Query parameters (route)
+- Execution time (ms)
+- HTTP response status + response size (bytes)
+
+### View JSON feature
+
+Displayed alongside View API. The viewer renders the pretty-printed Cube
+response and offers **Copy to clipboard** and an **Expand / Collapse** toggle.
+No tokens or secrets are included — the redaction happens server-side.
+
+### Test coverage
+
+Blocked: `SELECT * FROM Orders`, `DROP TABLE Customers`, `DELETE FROM Sales`,
+`UNION SELECT password`, `Show entire database`, `Export all records`.
+Allowed: `Monthly revenue trend`, `Sales by region`, `Revenue share by category`,
+`Top customers`, `Why did profit decrease?`, `Revenue growth over time`.
+
 ## Installation
 
 ```bash
@@ -207,6 +276,13 @@ To validate Day 15 Explain Results Engine:
 ```bash
 cd backend
 python scripts/validate_day15.py
+```
+
+To validate Day 16 Governance, Security & Query Transparency Engine:
+
+```bash
+cd backend
+python scripts/validate_day16.py
 ```
 
 ## Supported Questions (Day 10 Semantic Search)

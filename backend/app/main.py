@@ -14,7 +14,9 @@ from app.api.routes import router as routes_router
 from app.api.sales import router as sales_router
 from app.api.semantic import router as semantic_router
 from app.api.explain import router as explain_router
+from app.api.governance import router as governance_router
 from app.agents.bi_agent import BIAgent
+from app.governance.policy_engine import PolicyEngine
 from app.models.schemas import BIQuestionRequest, BIAnswerResponse
 from app.services.database import check_database_connection
 
@@ -54,25 +56,74 @@ app.include_router(metrics_router, prefix="/api/v1", tags=["metrics"])
 app.include_router(health_router, prefix="/api/v1", tags=["health"])
 app.include_router(semantic_router)
 app.include_router(explain_router)
+app.include_router(governance_router)
+
+_POLICY = PolicyEngine()
+
+
+def _attach_transparency(payload: dict, question: str, route: str, cube_response: dict | None) -> None:
+    """Attach cube_trace + cube_json payloads for the frontend View API / View JSON buttons."""
+    cube_response = cube_response or payload.get("cube_response") or {}
+    request_payload = {"question": question}
+    trace = {
+        "endpoint": "/cubejs-api/v1/load",
+        "method": "POST",
+        "request_payload": request_payload,
+        "query_parameters": {"route": route},
+        "execution_time_ms": 0,
+        "response_status": 200,
+        "response_size_bytes": 0,
+    }
+    try:
+        import json
+        trace["response_size_bytes"] = len(json.dumps(cube_response or {}))
+    except Exception:
+        pass
+    payload.setdefault("cube_trace", trace)
+    payload.setdefault("cube_json", cube_response or {})
+    try:
+        _POLICY.logger.write_cube_trace(
+            question=question,
+            route=route,
+            cube_trace=trace,
+        )
+    except Exception:
+        pass
 
 
 @app.post("/ask", response_model=BIAnswerResponse, tags=["BI Agent"])
 async def ask_question(request: BIQuestionRequest):
     """
     Ask a natural language business question to the BI Agent.
-    The agent will use Cube.dev to get data and return a business insight.
+    The question first passes through the Day 16 Governance Policy Engine
+    (SQL / expensive query blocking). Analytics are then answered via the
+    Cube.dev Semantic API — direct SQL or database access is never used.
     """
+    question = (request.question or "").strip()
+    policy_result = _POLICY.validate(question, route="/ask")
+    if not policy_result.allowed:
+        payload = policy_result.as_http_error()
+        detail = payload.get("detail") or "Governance policy blocked this request"
+        logger.warning("Governance blocked /ask: %s", detail)
+        raise HTTPException(status_code=403, detail=detail)
     try:
         agent = BIAgent()
-        return await agent.ask(request.question)
+        answer = await agent.ask(question)
+        answer_dict = answer if isinstance(answer, dict) else answer.model_dump()
+        cube_body = answer_dict.get("cube_response") if isinstance(answer_dict, dict) else None
+        _attach_transparency(answer_dict, question, "/ask", cube_body)
+        return BIAnswerResponse(**answer_dict)
     except ValueError as exc:
         logger.warning("Invalid BI request: %s", exc)
+        _POLICY.logger.write_error(question=question, route="/ask", error_type="ValueError", detail=str(exc))
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except RuntimeError as exc:
         logger.exception("BI agent runtime failure")
+        _POLICY.logger.write_error(question=question, route="/ask", error_type="RuntimeError", detail=str(exc))
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("Failed to process question")
+        _POLICY.logger.write_error(question=question, route="/ask", error_type="Exception", detail=str(exc))
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

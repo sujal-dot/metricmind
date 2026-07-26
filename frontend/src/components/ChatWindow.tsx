@@ -6,6 +6,7 @@ import TypingIndicator from './TypingIndicator';
 import EmptyState from './EmptyState';
 import SidebarHistory from './SidebarHistory';
 import VisualizationMessage from './chat/VisualizationMessage';
+import { SecurityBanner } from './governance';
 import type { ChatMessage as ChatMessageType } from '@/types/chat';
 import { useChat } from '@/hooks/useChat';
 
@@ -74,6 +75,10 @@ export default function ChatWindow() {
               </button>
             )}
           </div>
+        </div>
+
+        <div className="px-4 pt-4">
+          <SecurityBanner />
         </div>
 
         <div className="flex-1 overflow-y-auto">

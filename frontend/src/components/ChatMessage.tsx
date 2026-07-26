@@ -4,6 +4,7 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useState } from 'react';
 import type { ChatMessage } from '@/types/chat';
+import { ViewAPIButton, ViewJSONButton, PolicyViolation } from './governance';
 
 interface ChatMessageProps {
   message: ChatMessage;
@@ -21,6 +22,10 @@ export default function ChatMessage({ message }: ChatMessageProps) {
       console.error('Failed to copy:', err);
     }
   };
+
+  const hasTransparency = message.role === 'assistant' &&
+    (message.cube_trace || message.cube_json);
+  const hasViolation = !!message.policy_violation && !message.policy_violation.allowed;
 
   return (
     <div
@@ -74,6 +79,25 @@ export default function ChatMessage({ message }: ChatMessageProps) {
           <div className="text-gray-800 prose prose-sm max-w-none">
             <Markdown remarkPlugins={[remarkGfm]}>{message.content}</Markdown>
           </div>
+
+          {hasViolation ? (
+            <div className="mt-4">
+              <PolicyViolation decision={message.policy_violation ?? null} />
+            </div>
+          ) : null}
+
+          {hasTransparency ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <ViewAPIButton trace={message.cube_trace ?? null} />
+              <ViewJSONButton
+                data={message.cube_json ?? null}
+                title="View JSON — Cube.dev Response"
+              />
+              <span className="text-[11px] text-gray-500 ml-1">
+                Query transparency · All analytics pass through Cube.dev only
+              </span>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

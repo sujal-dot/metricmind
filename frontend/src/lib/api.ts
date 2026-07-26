@@ -4,6 +4,9 @@ import type {
   SalesListResponse,
   BIAnswerResponse,
   SemanticSearchResponse,
+  GovernanceValidationRequest,
+  GovernanceValidationResponse,
+  ExplainResponse,
 } from '@/types/api';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
@@ -44,4 +47,17 @@ export const api = {
     const response = await apiClient.post('/semantic-search', { question });
     return response.data;
   },
+
+  governanceValidate: async (
+    payload: GovernanceValidationRequest
+  ): Promise<GovernanceValidationResponse> => {
+    const response = await apiClient.post('/governance/validate', payload);
+    return response.data;
+  },
+
+  explainQuestion: async (question: string): Promise<ExplainResponse> => {
+    const response = await apiClient.post('/explain', { question });
+    return response.data;
+  },
 };
+
