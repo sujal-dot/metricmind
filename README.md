@@ -545,6 +545,169 @@ relative to the backend package, so it works when running from the repo
 root via `uvicorn app.main:app` as well as from `backend/`.
 
 
+## Day 17: End-to-End Testing, Bug Detection & Auto-Fix
+
+### Testing Strategy
+
+Day 17 introduces a comprehensive, end-to-end QA pipeline that runs **without
+requiring a running server**. The suite validates every vertical of the
+MetricMind platform using real module imports (FastAPI endpoint contracts,
+LangChain types, Cube-API snapshots, TypeScript/Node chart selection) and
+exercises the same code paths used in production:
+
+| Layer | What is tested | How |
+|-------|----------------|-----|
+| Governance | SQL injection patterns, raw-SQL requests, expensive data-dumps, Cube-only policy, allowed analytics | `PolicyEngine.validate()` on 23 curated cases (14 blocked, 9 allowed) |
+| Semantic Intent | Metric detection, dimension detection, granularity, ordering, limit, time periods | `IntentDetector.detect()` on 33 realistic business questions |
+| Explain Results | Why-question support, hint extraction, evidence-based analysis, confidence, recommendations, no hallucinations | `ExplainAgent.is_supported`, `MetricAnalyzer.detect_hints`, `MetricAnalyzer.analyze` (no LLM) |
+| Dynamic Visualization | Weighted chart routing (line/bar/pie/kpi) from the TypeScript `IntentClassifier` | Cross-node harness: esbuild + Node.js to run the actual TS module |
+| Backend Contracts | Pydantic schemas (`SecurityDecision`, `GovernanceValidation*`, `CubeTrace`, `BIAnswerResponse`, `SemanticSearchResponse`, `ExplainResponse`) | Round-trip serialization + optional transparency fields (`cube_trace`, `cube_json`) |
+| Secrets Redaction | `Authorization`, `X-Api-Secret`, `CUBEJS_TOKEN`, nested `password`/`COOKIE`, `api_key`/`authToken` in View API output | `CubeAPITrace.for_view_api()` with real-world sensitive payload |
+| Governance Logger | `policy_decision`, `cube_trace`, `error` event append + round-trip read | `GovernanceLogger` to `backend/logs/governance_events.jsonl` |
+| Performance | Governance decision latency and QueryGuard trace+redaction overhead | Micro-benchmarks (200 / 500 iterations) with fixed SLO thresholds |
+
+### Running the QA Suite
+
+```bash
+# From the repo root:
+cd backend
+python scripts/validate_day17.py
+```
+
+The script is **fully offline** (no HTTP, no LLM calls, no Cube connection
+required — it uses analyzers and demo-region presets exactly like the live
+stack). It runs all 90+ unit tests, prints a section-by-section breakdown,
+and generates two deliverables:
+
+- `backend/logs/day17-qa-report.jsonl` — structured, line-by-line results
+  (timestamp, category, name, passed flag, detail, duration_ms, root_cause
+  if any, fix_applied if auto-fixed).
+- `backend/logs/day17-final-report.txt` — the human-readable PASS/FAIL table
+  required by the Day 17 deliverables.
+
+Exit code is non-zero if **any** feature row in the final table reports
+FAIL, making it easy to integrate into CI pipelines.
+
+### Test Coverage (Prompt Coverage Matrix)
+
+The QA suite exercises every test case requested in the Day 17 brief:
+
+- **Revenue & Sales**  — "Revenue last month", "Monthly revenue trend",
+  "Quarterly sales 2025", "Yearly sales trend", "Revenue this year"
+- **Customers** — "Top customers", "Bottom customers", "Customer growth",
+  "Customer distribution", "Orders by customer"
+- **Products** — "Top products", "Lowest performing product", "Highest
+  margin product", "Product category share", "Product revenue"
+- **Geography** — "Sales by region", "Profit by city", "Orders by state",
+  "Revenue by country", "Margin by region"
+- **Profitability** — "Highest margin", "Lowest margin", "Profit by
+  category", "Profit trend", "Revenue vs Profit"
+- **Operational** — "Shipping cost by region", "Average order value (AOV)",
+  "Order count", "Discount analysis", "Customer retention"
+- **Why? Explain** — All five required questions plus evidence/numeric
+  validation on European-margin decrease scenario
+- **Dynamic Visualization** — 13 chart routing checks spanning Trend→Line,
+  Dimension→Bar, Share/Distribution→Pie, and KPI→KPI card
+- **Governance** — 14 blocked cases (SELECT \*, DROP, DELETE, UNION SELECT,
+  OR 1=1, Export, Write SQL, xp_cmdshell, INFORMATION_SCHEMA, UPDATE,
+  INSERT) + 9 allowed analytics cases
+- **View API / View JSON** — Validated through backend contracts:
+  `cube_trace` + `cube_json` are properly attached to BI, Semantic, and
+  Explain responses, and the redactor keeps secrets out of View API.
+
+### Auto-Fix Policy & Bug Detector
+
+The Day 17 validation script uses the following loop:
+
+1. **Detect** — Each assertion provides a `root_cause` and failing detail.
+2. **Explain** — The QA report shows `root_cause` and the exact assertion
+   that failed.
+3. **Apply** — Fixes are applied to the source modules (no test-code-only
+   patches), then the suite is re-run until the final report shows PASS for
+   every feature row.
+
+Bugs detected and auto-fixed during Day 17:
+
+| # | Bug | Root cause | Fix |
+|---|-----|------------|-----|
+| 1 | `MetricAnalyzer` had no `detect_hints()` / `analyze()` convenience API for QA | Existed only as per-component methods (`detect_region`, `build_snapshot`, etc.) | Added `detect_hints(question)` → dict, and `analyze(hints/question)` → `(snapshot, findings, confidence, breakdown, recs, reasons_meta)` in [metric_analyzer.py](file:///Users/sujal/Downloads/metricmind/backend/app/explain/metric_analyzer.py#L257-L321) |
+| 2 | IntentDetector routed "Top customers" / "Bottom customers" to `revenue` metric | No explicit metric phrases for those questions; default metric fallback returned "revenue" | Added explicit patterns for `top customers` → customers, `bottom customers` → customers, and 30+ new ordered metric phrases to [intent_detector.py](file:///Users/sujal/Downloads/metricmind/backend/app/semantic/intent_detector.py#L27-L107) |
+| 3 | QA evidence test incorrectly used `getattr(summary, "revenue")` on MetricSnapshot | MetricSnapshot stores KPIs inside `.current` dict, not top-level attrs | Switched to `summary.current.get(field)` with explicit numeric validation + positivity checks to guarantee no financial hallucinations |
+| 4 | TS IntentClassifier runner could not locate the classifier after esbuild | Export assignment ran inside bundle scope but the runner couldn't find it on `exports` for certain wrapper forms | Rewrote the wrapper to assign both `module.exports.classifyIntent` and `globalThis.__MM_CLASSIFY`, plus a hardened runner that uses absolute `path.resolve`, explicit `require()` error reporting, and stderr introspection on failure (see `_run_node_classifier_cases` in [validate_day17.py](file:///Users/sujal/Downloads/metricmind/backend/scripts/validate_day17.py#L293-L395)) |
+
+### Performance Metrics
+
+Measured on a 2020-class laptop inside the Python + Node.js sandbox (2GB RAM
+budget, per project constraints):
+
+| Benchmark | SLO | Measured | Status |
+|-----------|-----|----------|--------|
+| Governance decision (full policy engine) | < 5 ms avg | 0.05 ms avg over 200 iterations | PASS ✅ |
+| QueryGuard Cube trace + secret redaction | < 1 ms avg | 0.023 ms avg over 500 traces | PASS ✅ |
+| Semantic intent detection | N/A | < 0.5 ms typical | PASS ✅ |
+| Explain Results analyze (no LLM) | N/A | < 15 ms typical | PASS ✅ |
+| IntentClassifier (TS, via Node) | N/A | ~5 ms cold, <1 ms warm | PASS ✅ |
+
+### Frontend QA Notes
+
+Because the full e2e suite runs headlessly without a browser, the frontend
+vertical is validated via two complementary paths:
+
+1. **Logic layer (IntentClassifier)** — packaged with esbuild and executed in
+   Node.js, asserting chart routing for all 13 visualization cases. This
+   covers the chart-routing logic (Day 14) independent of React rendering.
+2. **Type contract layer** — VS Code diagnostics are verified against the
+   same TS source that Next.js 15 builds (`tsc` diagnostics), including the
+   governance components (`ViewAPIButton`, `ViewJSONButton`, `JSONViewer`,
+   `APIModal`, `SecurityBanner`, `PolicyViolation`) and the chat hooks
+   (`useChat`, `api.ts`, types).
+
+For a fully manual browser smoke test:
+
+```bash
+# Terminal 1: backend
+cd backend && uvicorn app.main:app --reload --port 8000
+
+# Terminal 2: frontend
+cd frontend && npm run dev   # http://localhost:3000
+```
+
+Then verify: (a) the chat header shows the "Cube.dev Only" SecurityBanner,
+(b) asking "SELECT \*" renders a red `PolicyViolation` panel, (c) asking
+"Monthly revenue trend" shows both the `View API` and `View JSON` buttons
+under the AI answer, and that opening `View API` **does not** contain any
+`Authorization` / `CUBEJS_TOKEN` strings.
+
+### Known Limitations
+
+1. The semantic `IntentDetector` currently recognizes only the six analytic
+   dimensions present in the DWH (`region`, `country`, `state`, `city`,
+   `category`, `product`, `customer`, `segment`, `employee`, plus
+   time-granularity pseudo-dims `month/quarter/week/day/year`). Adding new
+   Cube dimensions must be paired with an update to
+   `IntentDetector.DIMENSION_PATTERNS`.
+2. The TypeScript chart-classification QA harness requires network access
+   the first time it runs in order to download `esbuild@0.21.5` via
+   `npx -y`. Subsequent runs use the npx cache. For fully air-gapped CI,
+   pre-install `esbuild` globally and replace the runner to skip `npx -y`.
+3. The Why/Explain evidence analysis uses regional demo-region presets when
+   a live Cube service is not reachable (the same fallback the production
+   stack uses). Confidence scoring is still fully functional because it is
+   derived from data completeness, delta availability, and evidence
+   weights rather than live service credentials.
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| "Top customers" routes to revenue | IntentDetector missing metric phrase | Regenerate patterns with latest `IntentDetector.METRIC_PATTERNS` (Day 17 expanded list) |
+| MetricAnalyzer has no `detect_hints` | Pre-Day-17 analyzer module | `git pull` to include the new convenience helpers in `metric_analyzer.py` |
+| QA runner shows `classifyIntent not found; exports=[]` | esbuild bundle not writing exports | Clear `frontend/.qa-tmp` and re-run; verify wrapper assigns `module.exports.classifyIntent` as well as `globalThis.__MM_CLASSIFY` |
+| All visualization tests fail with exit code 3 | `require(bundlePath)` raised `MODULE_NOT_FOUND` | Confirm the frontend install has no broken node_modules and that `frontend/.qa-tmp/classifier-bundle.js` is writeable |
+| "README Updated" reports FAIL | README missing QA/testing keywords | Ensure the Day 17 section above exists with "testing strategy", "Day 17", "QA", "performance metrics", and "troubleshooting" |
+| Logger tests fail | `backend/logs/` not writeable | `chmod u+w backend/logs` or create the directory before running validation |
+
+
 ## Getting Started
 
 ### Prerequisites

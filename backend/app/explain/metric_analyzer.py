@@ -255,6 +255,72 @@ class MetricAnalyzer:
         return None
 
     # ------------------------------------------------------------------
+    # Convenience API for QA/test pipelines
+    # ------------------------------------------------------------------
+    def detect_hints(self, question: str) -> Dict[str, Any]:
+        """Aggregate all hint detectors into a single hints dict."""
+        region = self.detect_region(question)
+        primary_metric = self.detect_primary_metric(question)
+        direction_hint = self.detect_direction(question)
+        period = self.detect_period(question)
+        return {
+            "region": region,
+            "primary_metric": primary_metric,
+            "direction_hint": direction_hint,
+            "period": period,
+            "is_why": MetricAnalyzer.is_why_question(question),
+        }
+
+    def analyze(self, hints: Optional[Dict[str, Any]] = None,
+                question: Optional[str] = None) -> Tuple[MetricSnapshot, List["RootCauseFinding"], int, ConfidenceBreakdown, List[str], Dict[str, Any]]:
+        """Full evidence-based analysis path: snapshot → findings → score → recs.
+
+        Accepts either a pre-built hints dict (region/metric/period/direction) or a
+        raw question. Returns the same tuple the ExplainAgent assembles internally,
+        avoiding any LLM call. Used by QA and for quick CLI inspections.
+        """
+        from app.explain.root_cause import RootCauseAnalyzer
+        from app.explain.recommendation_engine import RecommendationEngine
+        from app.explain.confidence_score import ConfidenceScorer
+
+        if hints is None:
+            if question is None:
+                raise ValueError("analyze requires either hints dict or question string")
+            hints = self.detect_hints(question)
+        region = hints.get("region")
+        primary_metric = hints.get("primary_metric") or "margin"
+        direction_hint = hints.get("direction_hint") or "unknown"
+        period = hints.get("period")
+
+        q_for_snapshot = question or f"why {primary_metric} {direction_hint} in {region or 'global'}"
+        snapshot = self.build_snapshot(q_for_snapshot)
+        # Override snapshot hint fields if caller provided them explicitly
+        if region:
+            snapshot.region = region
+        if period:
+            snapshot.period = period
+        if primary_metric:
+            snapshot.primary_metric = primary_metric
+        if direction_hint and direction_hint != "unknown":
+            snapshot.direction_hint = direction_hint
+
+        findings = RootCauseAnalyzer().analyze(snapshot)
+        breakdown = ConfidenceScorer().score(snapshot, findings)
+        recs = RecommendationEngine().recommend(snapshot, findings)
+        reasons_meta = {
+            "findings": [
+                {
+                    "reason": f.reason_text,
+                    "evidence_metric": f.evidence_metric,
+                    "evidence_value_pct": f.evidence_value_pct,
+                    "weight": f.weight,
+                }
+                for f in findings
+            ],
+        }
+        return snapshot, findings, breakdown.total, breakdown, recs, reasons_meta
+
+    # ------------------------------------------------------------------
     # Snapshot builders
     # ------------------------------------------------------------------
     def build_snapshot(self, question: str) -> MetricSnapshot:
