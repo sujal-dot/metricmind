@@ -4,23 +4,23 @@ cube(`FactSales`, {
   
   joins: {
     DimCustomer: {
-      sql: `${CUBE}.customer_key = ${DimCustomer}.customerKey`,
+      sql: `${CUBE}.customer_key = ${DimCustomer.customerKey}`,
       relationship: `belongsTo`
     },
     DimProduct: {
-      sql: `${CUBE}.product_key = ${DimProduct}.productKey`,
+      sql: `${CUBE}.product_key = ${DimProduct.productKey}`,
       relationship: `belongsTo`
     },
     DimDate: {
-      sql: `${CUBE}.date_key = ${DimDate}.dateKey`,
+      sql: `${CUBE}.date_key = ${DimDate.dateKey}`,
       relationship: `belongsTo`
     },
     DimRegion: {
-      sql: `${CUBE}.region_key = ${DimRegion}.regionKey`,
+      sql: `${CUBE}.region_key = ${DimRegion.regionKey}`,
       relationship: `belongsTo`
     },
     DimEmployee: {
-      sql: `${CUBE}.employee_key = ${DimEmployee}.employeeKey`,
+      sql: `${CUBE}.employee_key = ${DimEmployee.employeeKey}`,
       relationship: `belongsTo`
     }
   },
@@ -97,6 +97,18 @@ cube(`FactSales`, {
     orderId: {
       sql: `order_id`,
       type: `string`
+    },
+
+    salesAmount: {
+      sql: `sales_amount`,
+      type: `number`,
+      shown: false
+    },
+
+    quantity: {
+      sql: `quantity`,
+      type: `number`,
+      shown: false
     },
     
     createdAt: {

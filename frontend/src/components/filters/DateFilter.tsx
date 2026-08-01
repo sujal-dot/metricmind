@@ -7,6 +7,7 @@ interface DateFilterProps {
   dateTo: string;
   onDateFromChange: (value: string) => void;
   onDateToChange: (value: string) => void;
+  maxDate?: string;
   className?: string;
 }
 
@@ -15,6 +16,7 @@ export default function DateFilter({
   dateTo,
   onDateFromChange,
   onDateToChange,
+  maxDate,
   className = '',
 }: DateFilterProps) {
   const presets = [
@@ -25,8 +27,9 @@ export default function DateFilter({
   ];
 
   const applyPreset = (days: number) => {
-    const to = new Date();
+    const to = maxDate ? new Date(`${maxDate}T00:00:00`) : new Date();
     const from = new Date();
+    from.setTime(to.getTime());
     from.setDate(from.getDate() - days);
     onDateFromChange(from.toISOString().split('T')[0]);
     onDateToChange(to.toISOString().split('T')[0]);
@@ -41,21 +44,23 @@ export default function DateFilter({
     <div className={`flex flex-col gap-3 ${className}`}>
       <label className="block">
         <span className="text-sm font-medium text-gray-700">Date Range</span>
-        <div className="mt-1 flex flex-col sm:flex-row gap-2">
-          <div className="flex items-center gap-2">
+        <div className="mt-1 flex flex-col gap-2">
+          <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
             <input
               type="date"
               value={dateFrom}
+              max={maxDate}
               onChange={(e) => onDateFromChange(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               aria-label="From date"
             />
             <span className="text-gray-500 text-sm">to</span>
             <input
               type="date"
               value={dateTo}
+              max={maxDate}
               onChange={(e) => onDateToChange(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               aria-label="To date"
             />
           </div>

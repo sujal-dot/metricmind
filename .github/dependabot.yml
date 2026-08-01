@@ -1,0 +1,48 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    groups:
+      production:
+        dependency-type: "production"
+      dev:
+        dependency-type: "development"
+    labels:
+      - "dependencies"
+      - "frontend"
+
+  - package-ecosystem: "npm"
+    directory: "/cube"
+    schedule:
+      interval: "weekly"
+    groups:
+      production:
+        dependency-type: "production"
+      dev:
+        dependency-type: "development"
+    labels:
+      - "dependencies"
+      - "cube"
+
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    groups:
+      production:
+        dependency-type: "production"
+      dev:
+        dependency-type: "development"
+    labels:
+      - "dependencies"
+      - "backend"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"

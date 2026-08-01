@@ -4,13 +4,18 @@ export interface JsonObject {
   [key: string]: JsonValue;
 }
 
-export interface MetricsResponse {
+export interface MetricsBase {
   total_revenue: number;
   total_profit: number;
   profit_margin: number;
   total_orders: number;
   total_customers: number;
   average_order_value: number;
+}
+
+export interface MetricsResponse extends MetricsBase {
+  prior_metrics?: MetricsBase | null;
+  period_change_pct: Record<string, number | null>;
 }
 
 export interface SalesItem {

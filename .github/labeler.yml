@@ -1,0 +1,29 @@
+backend:
+  - backend/**/*
+  - backend/**
+
+frontend:
+  - frontend/**/*
+  - frontend/**
+
+cube:
+  - cube/**/*
+  - cube/**
+
+dbt:
+  - dbt/**/*
+  - dbt/**
+
+scripts:
+  - scripts/**/*
+  - scripts/**
+  - backend/scripts/**/*
+  - backend/scripts/**
+
+ci:
+  - .github/workflows/**/*
+  - .github/workflows/**
+
+docs:
+  - '**/*.md'
+  - 'README.md'

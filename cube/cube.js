@@ -2,10 +2,13 @@
 const process = require('process');
 
 module.exports = {
-  processSqlTemplates: true,
-  scheduledRefreshTimer: 60,
-  scheduledRefreshTimeZones: ['UTC'],
-  scheduledRefreshConcurrency: null,
+
+  // MetricMind keeps Cube model files in cube/model instead of Cube's
+  // default cube/schema directory.
+  schemaPath: 'model',
+  // Local dev does not need background refresh jobs, and disabling them avoids
+  // Cube Store startup noise while the API and Playground remain fully usable.
+  scheduledRefreshTimer: false,
   dbType: ({ dataSource }) => {
     return process.env.CUBEJS_DB_TYPE || 'postgres';
   },
@@ -19,7 +22,6 @@ module.exports = {
     return `metricmind_app`;
   },
   preAggregationsSchema: `pre_aggregations`,
-  allowDuplicateQueriesFromUserIds: [],
   // You can set up JWT authentication here if needed
   // jwt: {
   //   key: process.env.CUBEJS_API_SECRET,

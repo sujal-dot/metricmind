@@ -6,8 +6,9 @@ import logging
 import time
 from typing import Any, Dict
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth.dependencies import get_current_user, require_csrf
 from app.explain.explain_agent import ExplainAgent
 from app.governance.policy_engine import PolicyEngine
 from app.models.schemas import ExplainRequest, ExplainResponse
@@ -43,7 +44,11 @@ def _attach_transparency(payload: Dict[str, Any], question: str) -> None:
 
 
 @router.post("/explain", response_model=ExplainResponse)
-async def explain_question(request: ExplainRequest) -> ExplainResponse:
+async def explain_question(
+    request: ExplainRequest,
+    _: dict = Depends(get_current_user),
+    __: None = Depends(require_csrf),
+) -> ExplainResponse:
     """
     Analyze a "Why?" business question and return a structured, evidence-based
     root-cause analysis.
@@ -95,19 +100,19 @@ async def explain_question(request: ExplainRequest) -> ExplainResponse:
         _POLICY.logger.write_error(
             question=question, route="/explain", error_type="ValueError", detail=str(exc)
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail="Invalid request") from exc
     except RuntimeError as exc:
         logger.exception("Explain engine runtime failure for %s", question)
         _POLICY.logger.write_error(
             question=question, route="/explain", error_type="RuntimeError", detail=str(exc)
         )
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Analytics service unavailable") from exc
     except Exception as exc:
         logger.exception("Unhandled explain error for %s", question)
         _POLICY.logger.write_error(
             question=question, route="/explain", error_type="Exception", detail=str(exc)
         )
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {exc}") from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
     _attach_transparency(payload, question)
     duration_ms = (time.perf_counter() - start) * 1000

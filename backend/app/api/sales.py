@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
+from app.auth.dependencies import get_current_user
 from app.models.schemas import SalesListResponse
 from app.services.database import get_db
 from app.services.sales_service import SalesService
@@ -12,6 +13,7 @@ router = APIRouter(prefix="/sales", tags=["sales"])
 def list_sales(
     limit: int = Query(default=100, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
+    _: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> SalesListResponse:
     service = SalesService(db)

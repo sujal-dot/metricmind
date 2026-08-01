@@ -162,7 +162,7 @@ LLM_PROVIDER=groq
 OPENAI_API_KEY="your-openai-api-key"
 OPENAI_MODEL=gpt-4o
 GROQ_API_KEY="your-groq-api-key"
-GROQ_MODEL=llama3-8b-8192
+GROQ_MODEL=openai/gpt-oss-20b
 GEMINI_API_KEY="your-gemini-api-key"
 GEMINI_MODEL=gemini-1.5-pro
 
@@ -324,6 +324,4 @@ If `confidence < 70%` the response should be shown with a warning like:
 - If `/explain` returns HTTP 422 (Unsupported question), rephrase as a "Why?" question: the detector looks for prefixes like `why`, `how come`, `what caused`, `explain why`, `reason for`.
 - If `/explain` `confidence` is below 70%, compare a longer time window or add more specific filters (region, category, last month) to reduce uncertainty.
 - Logs are written to backend/logs/ directory (backend.log, explain_events.jsonl, and day* reports).
-
-
 

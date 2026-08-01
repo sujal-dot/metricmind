@@ -47,6 +47,7 @@ export interface KPIMetric {
   label: string;
   value: number;
   format: 'currency' | 'number' | 'percent';
+  color?: string;
   trend?: 'up' | 'down' | 'neutral';
   trendValue?: string;
   description?: string;

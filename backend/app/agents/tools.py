@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict, Type
+from typing import Any, Dict
 
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, Field
@@ -11,10 +11,19 @@ logger = logging.getLogger("metricmind.agents.tools")
 
 
 class CubeQueryInput(BaseModel):
-    query: Dict[str, Any] = Field(
-        ...,
-        description="Cube.dev query JSON object with measures, dimensions, timeDimensions, filters, limit, and order.",
+    query: Dict[str, Any] | None = Field(
+        None,
+        description="Optional wrapped Cube.dev query JSON object.",
     )
+    measures: list[str] | None = Field(None, description="Cube measure names to query.")
+    dimensions: list[str] | None = Field(None, description="Cube dimension names to group by.")
+    timeDimensions: list[Dict[str, Any]] | None = Field(None, description="Cube time dimension filters.")
+    filters: list[Dict[str, Any]] | None = Field(None, description="Cube filters.")
+    limit: int | None = Field(None, description="Maximum number of rows to return.")
+    order: Dict[str, Any] | None = Field(None, description="Cube order clause.")
+
+    class Config:
+        extra = "allow"
 
 
 class CubeQueryTool:
@@ -36,7 +45,10 @@ class CubeQueryTool:
             return json.dumps({"error": str(exc)})
 
     def as_langchain_tool(self) -> BaseTool:
-        async def _run_cube_query(query: Dict[str, Any]) -> str:
+        async def _run_cube_query(**kwargs: Any) -> str:
+            query = kwargs.pop("query", None)
+            if query is None:
+                query = {key: value for key, value in kwargs.items() if value is not None}
             return await self.arun(query)
 
         return StructuredTool.from_function(

@@ -175,12 +175,12 @@ def test_ask_endpoint_returns_expected_json(monkeypatch):
     response = client.post("/ask", json={"question": "What was the total revenue last month?"})
     assert response.status_code == 200
     payload = response.json()
-    assert payload == {
-        "question": "What was the total revenue last month?",
-        "answer": "Revenue last month was 125000.",
-        "source": "Cube API",
-        "provider": "groq",
-    }
+    assert payload["question"] == "What was the total revenue last month?"
+    assert payload["answer"] == "Revenue last month was 125000."
+    assert payload["source"] == "Cube API"
+    assert payload["provider"] == "groq"
+    assert "cube_trace" in payload
+    assert "cube_json" in payload
 
 
 def test_ask_endpoint_handles_invalid_request(monkeypatch):

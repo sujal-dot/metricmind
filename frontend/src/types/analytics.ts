@@ -15,10 +15,26 @@ export interface AnalyticsFilters {
   [key: string]: string | undefined;
 }
 
-export interface ChartDataPoint {
+export interface MonthlyAnalyticsPoint {
   label: string;
+  revenue: number;
+  profit: number;
+  orders: number;
+}
+
+export interface ChartDataPoint {
+  label?: string;
+  name?: string;
   value: number;
   category?: string;
+}
+
+export interface AnalyticsCharts {
+  monthly: MonthlyAnalyticsPoint[];
+  by_category: { name: string; value: number }[];
+  by_region: { name: string; value: number }[];
+  top_products: { name: string; value: number }[];
+  top_customers: { name: string; value: number }[];
 }
 
 export interface PieDataPoint {

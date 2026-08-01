@@ -4,12 +4,13 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: metricmind-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: metricmind
-      POSTGRES_PASSWORD: metricmind
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-generate-32-bytes}
       POSTGRES_DB: metricmind
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
     ports:
       - "5433:5432"
     healthcheck:
@@ -17,7 +18,109 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - metricmind-net
+
+  cube:
+    build:
+      context: ./cube
+      dockerfile: Dockerfile
+    container_name: metricmind-cube
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CUBEJS_DEV_MODE: "false"
+      CUBEJS_DB_TYPE: postgres
+      CUBEJS_DB_HOST: postgres
+      CUBEJS_DB_PORT: "5432"
+      CUBEJS_DB_NAME: metricmind
+      CUBEJS_DB_USER: metricmind
+      CUBEJS_DB_PASS: ${POSTGRES_PASSWORD:-change-me-generate-32-bytes}
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-change-me-generate-32-bytes}
+      CUBEJS_CACHE_AND_QUERY_DRIVER: postgres
+      CUBEJS_WEB_SOCKETS: "true"
+    ports:
+      - "4000:4000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4000/readyz || curl -sf http://localhost:4000/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    networks:
+      - metricmind-net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: metricmind-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      cube:
+        condition: service_healthy
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      HOST: 0.0.0.0
+      PORT: "8000"
+      DATABASE_URL: postgresql://metricmind:${POSTGRES_PASSWORD:-change-me-generate-32-bytes}@postgres:5432/metricmind
+      CUBE_API_URL: http://cube:4000/cubejs-api/v1
+      CUBE_API_SECRET: ${CUBEJS_API_SECRET:-change-me-generate-32-bytes}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-generate-32-bytes}
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
+      LLM_PROVIDER: ${LLM_PROVIDER:-groq}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-pro}
+      SEED_ON_BOOT: ${SEED_ON_BOOT:-0}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - metricmind-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: metricmind-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8000
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - metricmind-net
+
+networks:
+  metricmind-net:
+    driver: bridge
 
 volumes:
-  postgres_data:
-
+  postgres-data:

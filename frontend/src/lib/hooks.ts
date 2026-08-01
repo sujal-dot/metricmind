@@ -6,11 +6,21 @@ import type {
   BIAnswerResponse,
   SemanticSearchResponse,
 } from '@/types/api';
+import type { AnalyticsCharts, AnalyticsFilters } from '@/types/analytics';
 
 export function useMetrics<F extends Record<string, string | undefined>>(filters?: F) {
   return useQuery<MetricsResponse, Error>({
     queryKey: ['metrics', filters],
     queryFn: () => api.getMetrics(filters),
+    refetchOnWindowFocus: false,
+    staleTime: 60000,
+  });
+}
+
+export function useAnalyticsCharts(filters?: AnalyticsFilters) {
+  return useQuery<AnalyticsCharts, Error>({
+    queryKey: ['analyticsCharts', filters],
+    queryFn: () => api.getAnalyticsCharts(filters),
     refetchOnWindowFocus: false,
     staleTime: 60000,
   });

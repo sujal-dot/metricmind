@@ -1,0 +1,170 @@
+name: MetricMind CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  backend-lint-test:
+    name: Backend Lint & Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: metricmind
+          POSTGRES_PASSWORD: metricmind
+          POSTGRES_DB: metricmind
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U metricmind"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://metricmind:metricmind@localhost:5433/metricmind
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Install ruff for linting
+        run: pip install ruff
+
+      - name: Lint backend with ruff
+        working-directory: backend
+        run: ruff check app
+
+      - name: Run backend tests
+        working-directory: backend
+        run: |
+          if [ -d "tests" ]; then
+            pytest tests -v --tb=short
+          else
+            echo "No tests directory found, skipping pytest"
+          fi
+
+      - name: Run validate_day17 QA harness
+        run: |
+          if [ -f "backend/scripts/validate_day17.py" ]; then
+            python backend/scripts/validate_day17.py
+          else
+            echo "validate_day17.py not found, skipping QA harness"
+          fi
+
+  frontend-lint-build:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: npm-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            npm-
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Lint frontend with ESLint
+        working-directory: frontend
+        run: |
+          if npx eslint --version >/dev/null 2>&1; then
+            npx eslint src --ext .ts,.tsx
+          else
+            echo "ESLint not configured, skipping lint"
+          fi
+
+      - name: Build Next.js frontend
+        working-directory: frontend
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: npm run build
+
+  docker-build-smoke:
+    name: Docker Build Smoke Test
+    runs-on: ubuntu-latest
+    needs: [backend-lint-test, frontend-lint-build]
+    if: github.event_name == 'push' || github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Docker Compose
+        run: docker compose config
+
+      - name: Build backend Docker image
+        working-directory: backend
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "Building backend Docker image..."
+            docker buildx build . \
+              -f Dockerfile \
+              --progress=plain \
+              --tag metricmind/backend:ci \
+              --load
+          else
+            echo "backend/Dockerfile not found, skipping backend build"
+          fi
+
+      - name: Build frontend Docker image
+        working-directory: frontend
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "Building frontend Docker image..."
+            docker buildx build . \
+              -f Dockerfile \
+              --progress=plain \
+              --tag metricmind/frontend:ci \
+              --load
+          else
+            echo "frontend/Dockerfile not found, skipping frontend build"
+          fi
+
+      - name: Build cube Docker image
+        working-directory: cube
+        run: |
+          if [ -f "Dockerfile" ]; then
+            echo "Building cube Docker image..."
+            docker buildx build . \
+              -f Dockerfile \
+              --progress=plain \
+              --tag metricmind/cube:ci \
+              --load
+          else
+            echo "cube/Dockerfile not found, skipping cube build"
+          fi

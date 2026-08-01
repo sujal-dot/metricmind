@@ -1,12 +1,14 @@
 """Metric Analyzer - retrieve and compare business metrics from Cube API / MetricsService."""
 from __future__ import annotations
 
+import asyncio
 import logging
-import random
 import re
 from dataclasses import dataclass, field
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.agents.cube_client import CubeClient
 from app.services.metrics_service import MetricsService
 
 logger = logging.getLogger("metricmind.explain.metric_analyzer")
@@ -18,87 +20,6 @@ REGION_ALIASES: Dict[str, List[str]] = {
     "Latin America": ["latin america", "latam", "south america", "brazil", "mexico"],
     "Middle East": ["middle east", "mena", "uae", "saudi"],
     "Africa": ["africa", "african", "nigeria", "egypt", "south africa"],
-}
-
-REGION_METRIC_PRESETS: Dict[str, Dict[str, float]] = {
-    "Europe": {
-        "revenue": 1_420_000,
-        "profit": 240_000,
-        "cost": 1_180_000,
-        "shipping_cost": 165_000,
-        "discount_amount": 78_000,
-        "orders": 2840,
-        "customers": 612,
-        "aov": 500,
-        "margin": 0.169,
-    },
-    "North America": {
-        "revenue": 1_680_000,
-        "profit": 420_000,
-        "cost": 1_260_000,
-        "shipping_cost": 132_000,
-        "discount_amount": 54_000,
-        "orders": 3360,
-        "customers": 704,
-        "aov": 500,
-        "margin": 0.25,
-    },
-    "Asia Pacific": {
-        "revenue": 950_000,
-        "profit": 171_000,
-        "cost": 779_000,
-        "shipping_cost": 112_000,
-        "discount_amount": 38_000,
-        "orders": 2100,
-        "customers": 430,
-        "aov": 452,
-        "margin": 0.18,
-    },
-    "Latin America": {
-        "revenue": 520_000,
-        "profit": 72_800,
-        "cost": 447_200,
-        "shipping_cost": 82_000,
-        "discount_amount": 26_000,
-        "orders": 1300,
-        "customers": 210,
-        "aov": 400,
-        "margin": 0.14,
-    },
-    "Middle East": {
-        "revenue": 380_000,
-        "profit": 72_200,
-        "cost": 307_800,
-        "shipping_cost": 54_000,
-        "discount_amount": 17_000,
-        "orders": 760,
-        "customers": 140,
-        "aov": 500,
-        "margin": 0.19,
-    },
-    "Africa": {
-        "revenue": 210_000,
-        "profit": 31_500,
-        "cost": 178_500,
-        "shipping_cost": 36_000,
-        "discount_amount": 12_000,
-        "orders": 520,
-        "customers": 84,
-        "aov": 403,
-        "margin": 0.15,
-    },
-}
-
-GLOBAL_PREV_PRESETS: Dict[str, float] = {
-    "revenue": 4_700_000,
-    "profit": 950_000,
-    "cost": 3_750_000,
-    "shipping_cost": 450_000,
-    "discount_amount": 180_000,
-    "orders": 9500,
-    "customers": 2000,
-    "aov": 495,
-    "margin": 0.202,
 }
 
 
@@ -118,7 +39,7 @@ class MetricSnapshot:
     deltas_abs: Dict[str, float] = field(default_factory=dict)
 
     cube_queries: List[Dict[str, Any]] = field(default_factory=list)
-    source: str = "demo"  # "cube_api" or "demo"
+    source: str = "demo"
 
     def get(self, key: str) -> Optional[float]:
         return self.current.get(key)
@@ -193,8 +114,24 @@ class MetricAnalyzer:
         ("better", "up"),
     )
 
+    CUBE_MEASURE_MAP: Dict[str, str] = {
+        "FactSales.revenue": "revenue",
+        "FactSales.profit": "profit",
+        "FactSales.totalOrders": "orders",
+        "FactSales.totalCustomers": "customers",
+        "FactSales.averageOrderValue": "aov",
+        "FactSales.margin": "margin_ratio",
+        "FactSales.discountAmount": "discount_amount",
+        "FactSales.cost": "cost",
+    }
+
     def __init__(self, metrics_service: Optional[MetricsService] = None):
         self.metrics_service = metrics_service or MetricsService()
+        try:
+            self.cube_client: Optional[CubeClient] = CubeClient()
+        except Exception:
+            self.cube_client = None
+            logger.warning("CubeClient unavailable in MetricAnalyzer - will use fallbacks")
 
     # ------------------------------------------------------------------
     # Why-question detection
@@ -271,8 +208,11 @@ class MetricAnalyzer:
             "is_why": MetricAnalyzer.is_why_question(question),
         }
 
-    def analyze(self, hints: Optional[Dict[str, Any]] = None,
-                question: Optional[str] = None) -> Tuple[MetricSnapshot, List["RootCauseFinding"], int, ConfidenceBreakdown, List[str], Dict[str, Any]]:
+    async def analyze(
+        self,
+        hints: Optional[Dict[str, Any]] = None,
+        question: Optional[str] = None,
+    ) -> Tuple[MetricSnapshot, List["RootCauseFinding"], int, "ConfidenceBreakdown", List[str], Dict[str, Any]]:
         """Full evidence-based analysis path: snapshot → findings → score → recs.
 
         Accepts either a pre-built hints dict (region/metric/period/direction) or a
@@ -293,8 +233,7 @@ class MetricAnalyzer:
         period = hints.get("period")
 
         q_for_snapshot = question or f"why {primary_metric} {direction_hint} in {region or 'global'}"
-        snapshot = self.build_snapshot(q_for_snapshot)
-        # Override snapshot hint fields if caller provided them explicitly
+        snapshot = await self.build_snapshot(q_for_snapshot)
         if region:
             snapshot.region = region
         if period:
@@ -320,28 +259,317 @@ class MetricAnalyzer:
         }
         return snapshot, findings, breakdown.total, breakdown, recs, reasons_meta
 
+    def analyze_sync(
+        self,
+        hints: Optional[Dict[str, Any]] = None,
+        question: Optional[str] = None,
+    ) -> Tuple[MetricSnapshot, List["RootCauseFinding"], int, "ConfidenceBreakdown", List[str], Dict[str, Any]]:
+        """Synchronous wrapper for analyze() — runs via asyncio.run()."""
+        try:
+            loop = asyncio.get_event_loop()
+            if not loop.is_running():
+                return loop.run_until_complete(self.analyze(hints=hints, question=question))
+        except RuntimeError:
+            pass
+        return asyncio.run(self.analyze(hints=hints, question=question))
+
     # ------------------------------------------------------------------
     # Snapshot builders
     # ------------------------------------------------------------------
-    def build_snapshot(self, question: str) -> MetricSnapshot:
+
+    @staticmethod
+    def _default_date_ranges() -> Tuple[Tuple[date, date], Tuple[date, date]]:
+        """Return (current_date_range, prior_date_range) for Cube queries.
+
+        Default window: current = last 90 days, prior = 90 days before that.
+        """
+        today = date.today()
+        current_to = today
+        current_from = today - timedelta(days=89)
+        prior_to = current_from - timedelta(days=1)
+        prior_from = prior_to - timedelta(days=89)
+        return (current_from, current_to), (prior_from, prior_to)
+
+    def _build_cube_query(
+        self,
+        region: Optional[str],
+        date_from: Optional[date] = None,
+        date_to: Optional[date] = None,
+    ) -> Dict[str, Any]:
+        """Build a Cube.dev query dict for measures + region filter + time range."""
+        measures = [
+            "FactSales.revenue",
+            "FactSales.profit",
+            "FactSales.totalOrders",
+            "FactSales.totalCustomers",
+            "FactSales.averageOrderValue",
+            "FactSales.margin",
+            "FactSales.discountAmount",
+            "FactSales.cost",
+        ]
+
+        filters: List[Dict[str, Any]] = []
+        if region:
+            filters.append({
+                "member": "DimRegion.region",
+                "operator": "equals",
+                "values": [region],
+            })
+
+        time_dimensions: List[Dict[str, Any]] = []
+        if date_from and date_to:
+            time_dimensions.append({
+                "dimension": "FactSales.createdAt",
+                "dateRange": [date_from.isoformat(), date_to.isoformat()],
+            })
+
+        return {
+            "measures": measures,
+            "filters": filters,
+            "timeDimensions": time_dimensions,
+        }
+
+    @staticmethod
+    def _estimate_missing(metrics: Dict[str, float]) -> Dict[str, float]:
+        """Cross-derive missing metrics from available ones. Never returns empty dict."""
+        m = dict(metrics)
+
+        revenue = m.get("revenue", 0.0)
+        profit = m.get("profit", 0.0)
+        cost = m.get("cost", 0.0)
+        orders = m.get("orders", 0)
+        aov = m.get("aov", 0.0)
+        margin_ratio = m.get("margin_ratio", 0.0)
+        discount_amount = m.get("discount_amount", 0.0)
+
+        if revenue == 0 and aov > 0 and orders > 0:
+            revenue = aov * orders
+            m["revenue"] = revenue
+        if profit == 0 and revenue > 0 and margin_ratio > 0:
+            profit = revenue * margin_ratio
+            m["profit"] = profit
+        if profit == 0 and revenue > 0 and cost > 0 and revenue > cost:
+            profit = revenue - cost
+            m["profit"] = profit
+        if cost == 0 and revenue > 0 and profit > 0:
+            cost = revenue - profit
+            m["cost"] = cost
+        if margin_ratio == 0 and revenue > 0 and profit > 0:
+            margin_ratio = profit / revenue
+            m["margin_ratio"] = margin_ratio
+        if aov == 0 and orders > 0 and revenue > 0:
+            aov = revenue / orders
+            m["aov"] = aov
+        if orders == 0 and aov > 0 and revenue > 0:
+            orders = int(round(revenue / aov))
+            m["orders"] = orders
+
+        if discount_amount == 0 and revenue > 0:
+            discount_amount = round(revenue * 0.03, 2)
+            m["discount_amount"] = discount_amount
+
+        shipping_cost = m.get("shipping_cost", 0.0)
+        if shipping_cost == 0 and revenue > 0:
+            shipping_cost = round(revenue * 0.10, 2)
+            m["shipping_cost"] = shipping_cost
+
+        customers = m.get("customers", 0)
+        if customers == 0 and orders > 0:
+            customers = max(1, int(round(orders * 0.35)))
+            m["customers"] = customers
+
+        margin = m.get("margin", 0.0)
+        if margin == 0 and margin_ratio > 0:
+            margin = margin_ratio
+            m["margin"] = margin
+        if margin == 0 and revenue > 0 and profit > 0:
+            margin = profit / revenue
+            m["margin"] = margin
+
+        for key in ("revenue", "profit", "cost", "shipping_cost", "discount_amount", "aov"):
+            if key in m and isinstance(m[key], (int, float)):
+                m[key] = float(round(m[key], 2))
+        if "orders" in m:
+            m["orders"] = int(m["orders"])
+        if "customers" in m:
+            m["customers"] = int(m["customers"])
+        if "margin" in m and m["margin"] > 1:
+            m["margin"] = m["margin"] / 100.0
+        if "margin_ratio" in m and m["margin_ratio"] > 1:
+            m["margin_ratio"] = m["margin_ratio"] / 100.0
+
+        if not m:
+            fallback_rev = 1_000_000.0
+            m = {
+                "revenue": fallback_rev,
+                "profit": round(fallback_rev * 0.20, 2),
+                "cost": round(fallback_rev * 0.80, 2),
+                "shipping_cost": round(fallback_rev * 0.10, 2),
+                "discount_amount": round(fallback_rev * 0.03, 2),
+                "orders": 2000,
+                "customers": 700,
+                "aov": round(fallback_rev / 2000, 2),
+                "margin": 0.20,
+                "margin_ratio": 0.20,
+            }
+            logger.warning("MetricAnalyzer fallback to fully-estimated baseline metrics")
+        return m
+
+    async def _run_cube_query(
+        self,
+        query: Dict[str, Any],
+    ) -> Tuple[Dict[str, float], Optional[Dict[str, Any]]]:
+        """Run a Cube query and extract mapped metrics. Returns (metrics, trace_info_or_None)."""
+        if self.cube_client is None:
+            return {}, None
+        try:
+            response = await self.cube_client.load(query)
+            data_rows = response.get("data") or [{}]
+            row = data_rows[0] if data_rows else {}
+            extracted: Dict[str, float] = {}
+            for cube_key, internal_key in self.CUBE_MEASURE_MAP.items():
+                if cube_key in row and row[cube_key] is not None:
+                    try:
+                        extracted[internal_key] = float(row[cube_key])
+                    except (TypeError, ValueError):
+                        continue
+            internal_orders = extracted.get("orders", 0.0)
+            if internal_orders > 0 and abs(internal_orders - int(internal_orders)) < 0.5:
+                extracted["orders"] = float(int(round(internal_orders)))
+            internal_customers = extracted.get("customers", 0.0)
+            if internal_customers > 0 and abs(internal_customers - int(internal_customers)) < 0.5:
+                extracted["customers"] = float(int(round(internal_customers)))
+            trace_info = {
+                "query": query,
+                "response_sample_keys": list(row.keys()),
+                "extracted_metrics": list(extracted.keys()),
+                "row": row,
+            }
+            return extracted, trace_info
+        except Exception as exc:
+            logger.warning("MetricAnalyzer Cube query failed: %s", exc)
+            return {}, None
+
+    async def build_snapshot(self, question: str) -> MetricSnapshot:
         question = question.strip()
         region = self.detect_region(question)
         primary = self.detect_primary_metric(question)
         direction = self.detect_direction(question)
         period = self.detect_period(question)
 
-        current = self._get_region_metrics(region)
-        prior = self._compute_prior(current, region, direction, primary)
+        (cur_from, cur_to), (prior_from, prior_to) = self._default_date_ranges()
+
+        current_query = self._build_cube_query(region, cur_from, cur_to)
+        prior_query = self._build_cube_query(region, prior_from, prior_to)
+
+        current_raw, current_trace = await self._run_cube_query(current_query)
+        prior_raw, prior_trace = await self._run_cube_query(prior_query)
+
+        cube_queries: List[Dict[str, Any]] = []
+        if current_trace is not None:
+            cube_queries.append({
+                "phase": "current",
+                "query": current_trace["query"],
+                "row": current_trace["row"],
+            })
+        else:
+            cube_queries.append({
+                "phase": "current",
+                "query": current_query,
+                "row": None,
+                "error": "cube_load_failed",
+            })
+        if prior_trace is not None:
+            cube_queries.append({
+                "phase": "prior",
+                "query": prior_trace["query"],
+                "row": prior_trace["row"],
+            })
+        else:
+            cube_queries.append({
+                "phase": "prior",
+                "query": prior_query,
+                "row": None,
+                "error": "cube_load_failed",
+            })
+
+        current_ok = bool(current_raw and any(v and v > 0 for v in current_raw.values()))
+        prior_ok = bool(prior_raw and any(v and v > 0 for v in prior_raw.values()))
+
+        if not current_ok:
+            try:
+                svc_result = await self.metrics_service.get_metrics(
+                    date_from=cur_from,
+                    date_to=cur_to,
+                    region=region,
+                )
+                for svc_key, internal_key in self.SERVICE_METRIC_MAP.items():
+                    if svc_key in svc_result and internal_key not in current_raw:
+                        current_raw[internal_key] = float(svc_result[svc_key])
+                        if svc_key == "profit_margin" and current_raw[internal_key] > 1:
+                            current_raw[internal_key] = current_raw[internal_key] / 100.0
+            except Exception as exc:
+                logger.warning("MetricAnalyzer metrics_service fallback for current failed: %s", exc)
+
+        if not prior_ok:
+            try:
+                svc_result = await self.metrics_service.get_metrics(
+                    date_from=prior_from,
+                    date_to=prior_to,
+                    region=region,
+                )
+                for svc_key, internal_key in self.SERVICE_METRIC_MAP.items():
+                    if internal_key not in prior_raw or prior_raw.get(internal_key, 0) == 0:
+                        prior_raw[internal_key] = float(svc_result[svc_key])
+                        if svc_key == "profit_margin" and prior_raw[internal_key] > 1:
+                            prior_raw[internal_key] = prior_raw[internal_key] / 100.0
+            except Exception as exc:
+                logger.warning("MetricAnalyzer metrics_service fallback for prior failed: %s", exc)
+
+        current = self._estimate_missing(current_raw)
+        prior = self._estimate_missing(prior_raw)
+
+        if not prior and current:
+            rev_ratio = 0.92
+            profit_ratio = 0.88
+            prior = {}
+            for k, v in current.items():
+                if k in ("margin", "margin_ratio"):
+                    prior[k] = v
+                elif k in ("orders", "customers"):
+                    prior[k] = max(1, int(round(v * rev_ratio)))
+                else:
+                    if k == "profit":
+                        prior[k] = round(v * profit_ratio, 2)
+                    else:
+                        prior[k] = round(v * rev_ratio, 2)
+            logger.warning("MetricAnalyzer: prior period unavailable, using proportional estimate from current")
 
         deltas_pct: Dict[str, float] = {}
         deltas_abs: Dict[str, float] = {}
         for key in current:
-            c = current[key]
+            c = float(current[key])
             p = prior.get(key)
-            if p is None or p == 0:
+            if p is None:
                 continue
-            deltas_pct[key] = round((c - p) / p * 100, 2)
+            p = float(p)
+            if p == 0 and c == 0:
+                continue
             deltas_abs[key] = round(c - p, 2)
+            if p != 0:
+                deltas_pct[key] = round((c - p) / abs(p) * 100, 2)
+            elif c != 0:
+                deltas_pct[key] = 100.0 if c > 0 else -100.0
+
+        current_after_ok = bool(current_raw and any(v and v > 0 for v in current_raw.values()))
+        prior_after_ok = bool(prior_raw and any(v and v > 0 for v in prior_raw.values()))
+
+        if current_after_ok and prior_after_ok:
+            source = "cube_api"
+        elif current_after_ok or prior_after_ok:
+            source = "cube_api_partial"
+        else:
+            source = "demo"
 
         snapshot = MetricSnapshot(
             question=question,
@@ -353,172 +581,25 @@ class MetricAnalyzer:
             prior=prior,
             deltas_pct=deltas_pct,
             deltas_abs=deltas_abs,
-            cube_queries=[
-                {
-                    "metrics": [
-                        "FactSales.revenue",
-                        "FactSales.profit",
-                        "FactSales.margin",
-                        "FactSales.discountAmount",
-                        "FactSales.totalOrders",
-                        "FactSales.totalCustomers",
-                        "FactSales.averageOrderValue",
-                    ],
-                    "dimensions": ["DimRegion.region", "DimDate.month"],
-                    "filters": (
-                        [{"member": "DimRegion.region", "operator": "equals", "values": [region]}]
-                        if region
-                        else []
-                    ),
-                },
-            ],
-            source="demo",
+            cube_queries=cube_queries,
+            source=source,
         )
         logger.info(
-            "Built snapshot question=%s region=%s primary=%s direction=%s",
+            "Built snapshot question=%s region=%s primary=%s direction=%s source=%s",
             question,
             region,
             primary,
             direction,
+            source,
         )
         return snapshot
 
-    def _get_region_metrics(self, region: Optional[str]) -> Dict[str, float]:
+    def build_snapshot_sync(self, question: str) -> MetricSnapshot:
+        """Synchronous wrapper for build_snapshot() — runs via asyncio.run()."""
         try:
-            service_metrics = self.metrics_service.get_metrics()
-        except Exception:
-            service_metrics = None
-
-        base: Dict[str, float]
-        if region and region in REGION_METRIC_PRESETS:
-            base = dict(REGION_METRIC_PRESETS[region])
-        elif region:
-            base = dict(random.choice(list(REGION_METRIC_PRESETS.values())))
-        else:
-            regional_totals = {k: 0.0 for k in next(iter(REGION_METRIC_PRESETS.values()))}
-            for preset in REGION_METRIC_PRESETS.values():
-                for k, v in preset.items():
-                    regional_totals[k] += v
-            base = regional_totals
-
-        if service_metrics:
-            for svc_key, metric_key in self.SERVICE_METRIC_MAP.items():
-                if svc_key in service_metrics and metric_key not in base and region is None:
-                    base[metric_key] = float(service_metrics[svc_key])
-            if region is None:
-                service_rev = float(service_metrics.get("total_revenue") or 0)
-                if service_rev > 0:
-                    ratio = service_rev / base["revenue"] if base["revenue"] else 1.0
-                    for k in ("revenue", "profit", "cost", "shipping_cost", "discount_amount"):
-                        if k in base:
-                            base[k] = round(base[k] * ratio, 2)
-                    base["margin"] = round(
-                        base["profit"] / base["revenue"], 4
-                    ) if base["revenue"] else base.get("margin", 0)
-                    base["orders"] = int(service_metrics.get("total_orders") or base.get("orders", 0))
-                    base["customers"] = int(service_metrics.get("total_customers") or base.get("customers", 0))
-                    base["aov"] = round(float(service_metrics.get("average_order_value") or base.get("aov", 0)), 2)
-        return base
-
-    def _compute_prior(
-        self,
-        current: Dict[str, float],
-        region: Optional[str],
-        direction: str,
-        primary: str,
-    ) -> Dict[str, float]:
-        """Produce a 'prior period' snapshot consistent with the direction hint
-        so the deltas match what the user is asking about."""
-        rng = random.Random(hash((region or "GLOBAL", primary, direction)) % (2**31))
-
-        def jitter(val: float, center_pct: float, spread: float) -> float:
-            return round(val * (1 - center_pct + rng.uniform(-spread, spread)), 2)
-
-        direction = direction or "unknown"
-        priors: Dict[str, float] = {}
-
-        if primary == "shipping_cost":
-            if direction == "up":
-                priors["shipping_cost"] = jitter(current["shipping_cost"], -0.14, 0.02)
-            elif direction == "down":
-                priors["shipping_cost"] = jitter(current["shipping_cost"], +0.05, 0.02)
-            else:
-                priors["shipping_cost"] = jitter(current["shipping_cost"], 0, 0.03)
-        else:
-            priors["shipping_cost"] = jitter(current["shipping_cost"], 0, 0.05)
-
-        base_direction = direction
-
-        cost_shift = 0.0
-        discount_shift = 0.0
-        mix_shift = 0.0
-        rev_shift = 0.0
-
-        if primary == "margin":
-            if base_direction == "down":
-                cost_shift = -0.08
-                discount_shift = -0.12
-                mix_shift = -0.10
-                rev_shift = -0.02
-            elif base_direction == "up":
-                cost_shift = +0.06
-                discount_shift = +0.09
-                mix_shift = +0.05
-                rev_shift = +0.03
-            else:
-                rev_shift = +0.02
-                cost_shift = +0.01
-        elif primary == "profit":
-            if base_direction == "down":
-                rev_shift = -0.07
-                cost_shift = -0.04
-                discount_shift = -0.06
-            elif base_direction == "up":
-                rev_shift = +0.10
-                cost_shift = +0.02
-                discount_shift = +0.05
-        elif primary == "revenue":
-            if base_direction == "down":
-                rev_shift = -0.09
-            elif base_direction == "up":
-                rev_shift = +0.12
-            cost_shift = rev_shift * 0.9
-        elif primary == "orders":
-            if base_direction == "down":
-                rev_shift = -0.08
-            elif base_direction == "up":
-                rev_shift = +0.06
-            cost_shift = rev_shift * 1.0
-        elif primary == "customers":
-            if base_direction == "down":
-                rev_shift = -0.04
-            elif base_direction == "up":
-                rev_shift = +0.09
-            cost_shift = rev_shift * 0.8
-        elif primary == "retention":
-            if base_direction == "down":
-                rev_shift = -0.03
-            elif base_direction == "up":
-                rev_shift = +0.02
-            cost_shift = rev_shift * 0.7
-        else:
-            cost_shift = +0.02
-
-        priors["revenue"] = jitter(current["revenue"], rev_shift, 0.01)
-        priors["cost"] = jitter(current["cost"], cost_shift, 0.01)
-        priors["discount_amount"] = jitter(current["discount_amount"], discount_shift, 0.02)
-        priors["orders"] = max(1, int(jitter(current["orders"], rev_shift, 0.02)))
-        priors["customers"] = max(1, int(jitter(current["customers"], rev_shift * 0.7, 0.02)))
-        priors["aov"] = round(
-            (priors["revenue"] / priors["orders"]) if priors["orders"] else current.get("aov", 0),
-            2,
-        )
-        priors["profit"] = jitter(
-            current["profit"],
-            (rev_shift - cost_shift * 0.6) if base_direction != "unknown" else 0,
-            0.01,
-        )
-        priors["margin"] = (
-            round(priors["profit"] / priors["revenue"], 4) if priors["revenue"] else current.get("margin", 0)
-        )
-        return priors
+            loop = asyncio.get_event_loop()
+            if not loop.is_running():
+                return loop.run_until_complete(self.build_snapshot(question))
+        except RuntimeError:
+            pass
+        return asyncio.run(self.build_snapshot(question))

@@ -9,182 +9,472 @@ import type {
   ChartType,
 } from '@/types/visualization';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+type CubeRow = Record<string, unknown>;
+type CubeResponse = { data: CubeRow[] } | Record<string, unknown>;
 
-const LINE_DEMO_DATASETS: Record<string, LineChartData> = {
-  default: {
-    labels: MONTHS,
-    series: [
-      { name: 'Revenue', data: [12000, 15000, 18000, 22000, 19000, 24000, 28000, 26000, 32000, 35000, 40000, 42000], color: '#3b82f6', smooth: true },
-      { name: 'Profit', data: [3000, 3750, 4500, 5500, 4750, 6000, 7000, 6500, 8000, 8750, 10000, 10500], color: '#10b981', smooth: true },
-    ],
-    yAxisFormatter: 'currency',
-  },
-  orders: {
-    labels: MONTHS,
-    series: [
-      { name: 'Orders', data: [120, 150, 180, 220, 190, 240, 280, 260, 320, 350, 400, 420], color: '#8b5cf6', smooth: true },
-    ],
-    yAxisFormatter: 'number',
-  },
-  customers: {
-    labels: MONTHS,
-    series: [
-      { name: 'Customers', data: [48, 60, 72, 88, 76, 96, 112, 104, 128, 140, 160, 168], color: '#06b6d4', smooth: true },
-    ],
-    yAxisFormatter: 'number',
-  },
-};
-
-const BAR_DEMO_DATASETS: Record<string, BarChartData> = {
-  region: {
-    labels: ['North America', 'Europe', 'Asia Pacific', 'Latin America', 'Middle East', 'Africa'],
-    data: [168000, 126000, 95000, 52000, 38000, 21000],
-    name: 'Revenue by Region',
-    orientation: 'horizontal',
-    color: '#10b981',
-    axisFormatter: 'currency',
-  },
-  category: {
-    labels: ['Technology', 'Office Supplies', 'Furniture', 'Consumer Electronics', 'Apparel', 'Home & Kitchen'],
-    data: [189000, 147000, 105000, 52000, 42000, 31000],
-    name: 'Revenue by Category',
-    orientation: 'vertical',
-    color: '#8b5cf6',
-    axisFormatter: 'currency',
-  },
-  product: {
-    labels: ['Product A', 'Product B', 'Product C', 'Product D', 'Product E', 'Product F', 'Product G', 'Product H', 'Product I', 'Product J'],
-    data: [52000, 48000, 41000, 36000, 29000, 22000, 18000, 15000, 12000, 9000],
-    name: 'Top Products',
-    orientation: 'horizontal',
-    color: '#f59e0b',
-    axisFormatter: 'currency',
-  },
-  customer: {
-    labels: ['Customer A', 'Customer B', 'Customer C', 'Customer D', 'Customer E', 'Customer F', 'Customer G', 'Customer H', 'Customer I', 'Customer J'],
-    data: [62000, 55000, 48000, 39000, 31000, 26000, 22000, 18000, 14000, 11000],
-    name: 'Top Customers',
-    orientation: 'horizontal',
-    color: '#06b6d4',
-    axisFormatter: 'currency',
-  },
-  default: {
-    labels: ['Technology', 'Office Supplies', 'Furniture'],
-    data: [189000, 147000, 105000],
-    name: 'Revenue',
-    orientation: 'vertical',
-    color: '#3b82f6',
-    axisFormatter: 'currency',
-  },
-};
-
-const PIE_DEMO_DATASETS: Record<string, PieChartData[]> = {
-  category: [
-    { name: 'Technology', value: 189000 },
-    { name: 'Office Supplies', value: 147000 },
-    { name: 'Furniture', value: 105000 },
-    { name: 'Consumer Electronics', value: 52000 },
-    { name: 'Apparel', value: 42000 },
-    { name: 'Home & Kitchen', value: 31000 },
-  ],
-  region: [
-    { name: 'North America', value: 168000 },
-    { name: 'Europe', value: 126000 },
-    { name: 'Asia Pacific', value: 95000 },
-    { name: 'Latin America', value: 52000 },
-    { name: 'Middle East', value: 38000 },
-    { name: 'Africa', value: 21000 },
-  ],
-  default: [
-    { name: 'Technology', value: 45000 },
-    { name: 'Office Supplies', value: 35000 },
-    { name: 'Furniture', value: 25000 },
-    { name: 'Other', value: 20000 },
-  ],
-};
-
-const KPI_DEFAULTS: KPIMetric[] = [
-  { label: 'Total Revenue', value: 500000, format: 'currency', trend: 'up', trendValue: '12.4%', description: 'vs prior period' },
-  { label: 'Total Profit', value: 125000, format: 'currency', trend: 'up', trendValue: '8.1%', description: 'vs prior period' },
-  { label: 'Profit Margin', value: 0.25, format: 'percent', trend: 'neutral', trendValue: '0.3%', description: 'vs prior period' },
-  { label: 'Total Orders', value: 3030, format: 'number', trend: 'up', trendValue: '5.7%', description: 'vs prior period' },
-  { label: 'Total Customers', value: 1284, format: 'number', trend: 'up', trendValue: '9.2%', description: 'vs prior period' },
-  { label: 'Average Order Value', value: 165, format: 'currency', trend: 'up', trendValue: '3.4%', description: 'vs prior period' },
+const PALETTE = [
+  '#3b82f6',
+  '#10b981',
+  '#8b5cf6',
+  '#f59e0b',
+  '#06b6d4',
+  '#f43f5e',
+  '#64748b',
+  '#84cc16',
+  '#ec4899',
+  '#6366f1',
 ];
 
-function resolveBarDataset(intent: DetectedIntent): BarChartData {
-  const dims = intent.dimensions.map((d) => d.toLowerCase());
-  if (dims.includes('region')) return BAR_DEMO_DATASETS.region;
-  if (dims.includes('category')) return BAR_DEMO_DATASETS.category;
-  if (dims.includes('product')) return BAR_DEMO_DATASETS.product;
-  if (dims.includes('customer')) return BAR_DEMO_DATASETS.customer;
-  if (intent.rawQuestion.toLowerCase().includes('top 10 customer') || intent.rawQuestion.toLowerCase().includes('top customer')) {
-    return BAR_DEMO_DATASETS.customer;
-  }
-  if (intent.rawQuestion.toLowerCase().includes('top') || intent.rawQuestion.toLowerCase().includes('best-selling')) {
-    return BAR_DEMO_DATASETS.product;
-  }
-  return BAR_DEMO_DATASETS.default;
+const CURRENCY_KEYWORDS = ['revenue', 'profit', 'cost', 'discount', 'margin', 'aov', 'averageordervalue', 'amount'];
+const TIME_GRANULARITIES = ['year', 'quarter', 'month', 'week', 'day'];
+const FACT_PREFIX_PATTERN = /^Fact[A-Z]\w*\./;
+const DIM_PREFIX_PATTERN = /^Dim[A-Z]\w*\./;
+
+function _pickColor(i: number): string {
+  return PALETTE[i % PALETTE.length];
 }
 
-function resolvePieDataset(intent: DetectedIntent): PieChartData[] {
-  const lower = intent.rawQuestion.toLowerCase();
-  if (lower.includes('region')) return PIE_DEMO_DATASETS.region;
-  if (lower.includes('category')) return PIE_DEMO_DATASETS.category;
-  if (lower.includes('customer')) return PIE_DEMO_DATASETS.default;
-  return PIE_DEMO_DATASETS.default;
+function _formatCurrency(n: number): string {
+  if (!isFinite(n)) return 'N/A';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) {
+    return `$${(n / 1e9).toFixed(1)}B`;
+  }
+  if (abs >= 1e6) {
+    return `$${(n / 1e6).toFixed(1)}M`;
+  }
+  if (abs >= 1e3) {
+    return `$${(n / 1e3).toFixed(1)}K`;
+  }
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(n);
 }
 
-function resolveLineDataset(intent: DetectedIntent): LineChartData {
-  const metrics = intent.metrics.map((m) => m.toLowerCase());
-  if (metrics.includes('orders') && !metrics.includes('revenue') && !metrics.includes('profit')) {
-    return LINE_DEMO_DATASETS.orders;
+function _formatNumber(n: number): string {
+  if (!isFinite(n)) return 'N/A';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) {
+    return `${(n / 1e9).toFixed(1)}B`;
   }
-  if (metrics.includes('customers') || lowerIncludes(intent.rawQuestion, ['customer', 'growth'])) {
-    return LINE_DEMO_DATASETS.customers;
+  if (abs >= 1e6) {
+    return `${(n / 1e6).toFixed(1)}M`;
   }
-  return LINE_DEMO_DATASETS.default;
+  if (abs >= 1e3) {
+    return `${(n / 1e3).toFixed(1)}K`;
+  }
+  return new Intl.NumberFormat('en-US').format(Math.round(n));
 }
 
-function lowerIncludes(text: string, needles: string[]): boolean {
-  const l = text.toLowerCase();
-  return needles.some((n) => l.includes(n.toLowerCase()));
+function _stripPrefix(key: string): string {
+  const withoutFactOrDim = key.replace(/^(Fact[A-Z]\w*|Dim[A-Z]\w*)\./, '');
+  const parts = withoutFactOrDim.split('.');
+  const last = parts[parts.length - 1] || withoutFactOrDim;
+  return last
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/[_-]/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function resolveKPIs(intent: DetectedIntent): KPIMetric[] {
-  const lower = intent.rawQuestion.toLowerCase();
-  if (lower.includes('total profit') || lower.includes('profit') && !lower.includes('revenue')) {
-    return [
-      { label: 'Total Profit', value: 125000, format: 'currency', trend: 'up', trendValue: '8.1%', description: 'vs prior period' },
-    ];
+function _displayName(key: string): string {
+  const name = _stripPrefix(key);
+  const map: Record<string, string> = {
+    Revenue: 'Revenue',
+    Profit: 'Profit',
+    Totalorders: 'Total Orders',
+    Totalquantity: 'Total Quantity',
+    Discountamount: 'Discount Amount',
+    Averageordervalue: 'Average Order Value',
+    Averageprofit: 'Average Profit per Order',
+    Margin: 'Profit Margin',
+    Totalcustomers: 'Total Customers',
+    Count: 'Count',
+  };
+  const compact = name.replace(/\s+/g, '');
+  return map[compact] || name;
+}
+
+function _isMeasureKey(key: string): boolean {
+  return FACT_PREFIX_PATTERN.test(key);
+}
+
+function _isDimensionKey(key: string): boolean {
+  return DIM_PREFIX_PATTERN.test(key);
+}
+
+function _extractByPrefix(rows: CubeRow[], prefix: string): string[] {
+  const allKeys = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (key.startsWith(prefix)) {
+        allKeys.add(key);
+      }
+    }
   }
-  if (lower.includes('total revenue') || (lowerIncludes(lower, ['revenue']) && !lowerIncludes(lower, ['profit', 'orders', 'customers', 'aov', 'average order value', 'margin']))) {
-    return [
-      { label: 'Total Revenue', value: 500000, format: 'currency', trend: 'up', trendValue: '12.4%', description: 'vs prior period' },
-    ];
+  return Array.from(allKeys);
+}
+
+function _extractKeysByPrefix(rows: CubeRow[], prefixPattern: RegExp): string[] {
+  const allKeys = new Set<string>();
+  for (const row of rows) {
+    for (const key of Object.keys(row)) {
+      if (prefixPattern.test(key)) {
+        allKeys.add(key);
+      }
+    }
   }
-  if (lowerIncludes(lower, ['total orders', 'number of orders', 'count of orders'])) {
-    return [
-      { label: 'Total Orders', value: 3030, format: 'number', trend: 'up', trendValue: '5.7%', description: 'vs prior period' },
-    ];
+  return Array.from(allKeys);
+}
+
+function _extractMeasureKeys(rows: CubeRow[]): string[] {
+  return _extractKeysByPrefix(rows, FACT_PREFIX_PATTERN);
+}
+
+function _extractDimensionKeys(rows: CubeRow[]): string[] {
+  return _extractKeysByPrefix(rows, DIM_PREFIX_PATTERN);
+}
+
+function _toNumber(val: unknown): number {
+  if (typeof val === 'number') return val;
+  if (typeof val === 'string') {
+    const parsed = parseFloat(val);
+    return isNaN(parsed) ? 0 : parsed;
   }
-  if (lowerIncludes(lower, ['customers', 'number of customers', 'count of customers'])) {
-    return [
-      { label: 'Total Customers', value: 1284, format: 'number', trend: 'up', trendValue: '9.2%', description: 'vs prior period' },
-    ];
+  return 0;
+}
+
+function _hasCurrencyMeasure(keys: string[]): boolean {
+  return keys.some((k) => {
+    const lower = k.toLowerCase();
+    return CURRENCY_KEYWORDS.some((ck) => lower.includes(ck));
+  });
+}
+
+function _isTimeKey(key: string): boolean {
+  const lower = key.toLowerCase();
+  if (lower.includes('createdat') || lower.includes('fulldate')) return true;
+  return TIME_GRANULARITIES.some((g) => key.endsWith(`.${g}`) || lower.includes(`.${g}`));
+}
+
+function _detectTimeLabelKey(rows: CubeRow[]): string | null {
+  if (rows.length === 0) return null;
+  const firstRow = rows[0];
+  const allKeys = Object.keys(firstRow);
+  const timeKeys = allKeys.filter(_isTimeKey);
+  if (timeKeys.length > 0) return timeKeys[0];
+  for (const key of allKeys) {
+    const val = firstRow[key];
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
+      return key;
+    }
   }
-  if (lowerIncludes(lower, ['average order value', 'aov'])) {
-    return [
-      { label: 'Average Order Value', value: 165, format: 'currency', trend: 'up', trendValue: '3.4%', description: 'vs prior period' },
-    ];
+  return null;
+}
+
+function _bestLabelKey(row: CubeRow, chartType: ChartType, dimensions: string[]): string | null {
+  const allKeys = Object.keys(row);
+  const dimKeys = allKeys.filter(_isDimensionKey);
+  const dimLower = dimensions.map((d) => d.toLowerCase());
+  for (const dim of dimLower) {
+    const match = dimKeys.find((k) => k.toLowerCase().includes(dim));
+    if (match) return match;
   }
-  if (lowerIncludes(lower, ['margin', 'profit margin', 'gross margin'])) {
-    return [
-      { label: 'Profit Margin', value: 0.25, format: 'percent', trend: 'neutral', trendValue: '0.3%', description: 'vs prior period' },
-    ];
+  const nonMeasureKeys = allKeys.filter((k) => !_isMeasureKey(k));
+  for (const k of nonMeasureKeys) {
+    if (!_isTimeKey(k)) return k;
   }
-  return KPI_DEFAULTS;
+  if (chartType === 'bar' || chartType === 'pie') {
+    return nonMeasureKeys[0] || null;
+  }
+  return null;
+}
+
+function _formatTimeLabel(raw: string): string {
+  if (!raw) return '';
+  try {
+    const date = new Date(raw);
+    if (isNaN(date.getTime())) return raw;
+    return new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      year: '2-digit',
+    }).format(date);
+  } catch {
+    return raw;
+  }
+}
+
+function _mapLineChart(
+  rows: CubeRow[],
+  _intent: DetectedIntent
+): LineChartData {
+  const timeLabelKey = _detectTimeLabelKey(rows);
+  const measureKeys = _extractMeasureKeys(rows);
+  const labels = timeLabelKey
+    ? rows.map((r) => _formatTimeLabel(String(r[timeLabelKey] ?? '')))
+    : rows.map((_, i) => String(i + 1));
+
+  const series = measureKeys.map((key, i) => ({
+    name: _displayName(key),
+    data: rows.map((r) => _toNumber(r[key])),
+    color: _pickColor(i),
+    smooth: true,
+  }));
+
+  const yAxisFormatter = _hasCurrencyMeasure(measureKeys) ? 'currency' : 'number';
+
+  return { labels, series, yAxisFormatter };
+}
+
+function _mapBarChart(
+  rows: CubeRow[],
+  intent: DetectedIntent
+): BarChartData {
+  const firstRow = rows[0] || {};
+  const labelKey = _bestLabelKey(firstRow, 'bar', intent.dimensions);
+  const measureKeys = _extractMeasureKeys(rows);
+  const hasManyLabels = rows.length > 8;
+  const orientation: 'horizontal' | 'vertical' = hasManyLabels ? 'horizontal' : 'vertical';
+  const intentHints = intent.rawQuestion.toLowerCase();
+  const forcedHorizontal = intentHints.includes('top 10') || intentHints.includes('top 5') || intentHints.includes('top ') || intentHints.includes('ranking');
+  const finalOrientation = forcedHorizontal ? 'horizontal' : orientation;
+
+  const labels = labelKey
+    ? rows.map((r) => String(r[labelKey] ?? ''))
+    : rows.map((_, i) => `Item ${i + 1}`);
+
+  let valueKey = measureKeys[0] || '';
+  const revenueKey = measureKeys.find((k) => k.toLowerCase().includes('revenue'));
+  if (revenueKey && intent.dimensions.length < 2) {
+    valueKey = revenueKey;
+  }
+
+  const data = rows.map((r) => _toNumber(r[valueKey]));
+  const name = _displayName(valueKey) || 'Value';
+  const color = _pickColor(0);
+  const axisFormatter = _hasCurrencyMeasure([valueKey]) ? 'currency' : 'number';
+
+  return { labels, data, name, orientation: finalOrientation, color, axisFormatter };
+}
+
+function _mapPieChart(
+  rows: CubeRow[],
+  intent: DetectedIntent
+): PieChartData[] {
+  const firstRow = rows[0] || {};
+  const labelKey = _bestLabelKey(firstRow, 'pie', intent.dimensions);
+  const measureKeys = _extractMeasureKeys(rows);
+  let valueKey = measureKeys[0] || '';
+  const revenueKey = measureKeys.find((k) => k.toLowerCase().includes('revenue'));
+  if (revenueKey) valueKey = revenueKey;
+
+  return rows.map((r) => ({
+    name: labelKey ? String(r[labelKey] ?? '') : 'Unknown',
+    value: _toNumber(r[valueKey]),
+  }));
+}
+
+function _mapKPIs(
+  rows: CubeRow[],
+  _intent: DetectedIntent,
+  deltas?: Record<string, number>
+): KPIMetric[] {
+  const firstRow = rows[0];
+  if (!firstRow) {
+    return [{
+      label: 'No Data',
+      value: 0,
+      format: 'number',
+      trend: 'neutral',
+      description: 'No aggregate data available',
+    }];
+  }
+  const measureKeys = _extractMeasureKeys(rows).slice(0, 4);
+  if (measureKeys.length === 0) {
+    return [{
+      label: 'Analysis Result',
+      value: 0,
+      format: 'number',
+      trend: 'neutral',
+      description: 'No metrics found in Cube response',
+    }];
+  }
+  return measureKeys.map((key, i) => {
+    const rawValue = firstRow[key];
+    const value = _toNumber(rawValue);
+    const isCurrency = _hasCurrencyMeasure([key]);
+    const name = _displayName(key);
+    const isPercent = name.toLowerCase().includes('margin');
+    let format: 'currency' | 'number' | 'percent' = 'number';
+    if (isPercent) format = 'percent';
+    else if (isCurrency) format = 'currency';
+    let finalValue = value;
+    if (format === 'percent' && Math.abs(value) <= 1) {
+      finalValue = value * 100;
+    }
+    const deltaKey = key.toLowerCase();
+    const delta = deltas?.[deltaKey] ?? 0;
+    let trend: 'up' | 'down' | 'neutral' = 'neutral';
+    let trendValue: string | undefined;
+    if (delta > 0) {
+      trend = 'up';
+      trendValue = `+${delta.toFixed(1)}%`;
+    } else if (delta < 0) {
+      trend = 'down';
+      trendValue = `${delta.toFixed(1)}%`;
+    }
+    return {
+      label: name,
+      value: finalValue,
+      format,
+      color: _pickColor(i),
+      trend,
+      trendValue,
+      description: delta !== undefined ? 'vs prior period' : undefined,
+    };
+  });
+}
+
+function _emptyLineChart(): LineChartData {
+  return {
+    labels: ['—', '—', '—', '—', '—', '—'],
+    series: [
+      { name: 'Insufficient data', data: [0, 0, 0, 0, 0, 0], color: '#cbd5e1', smooth: true },
+    ],
+    yAxisFormatter: 'number',
+  };
+}
+
+function _emptyBarChart(): BarChartData {
+  return {
+    labels: ['Waiting for Cube data'],
+    data: [0],
+    name: 'Insufficient data',
+    orientation: 'vertical',
+    color: '#cbd5e1',
+    axisFormatter: 'number',
+  };
+}
+
+function _emptyPieChart(): PieChartData[] {
+  return [
+    { name: 'Insufficient data', value: 1 },
+  ];
+}
+
+function _emptyKPIs(): KPIMetric[] {
+  return [
+    {
+      label: 'Insufficient data',
+      value: 0,
+      format: 'number',
+      trend: 'neutral',
+      description: 'Waiting for Cube response',
+    },
+  ];
+}
+
+function _waitingKPIs(): KPIMetric[] {
+  return [
+    {
+      label: 'Analysis result',
+      value: 0,
+      format: 'number',
+      trend: 'neutral',
+      description: 'Waiting for Cube data',
+    },
+  ];
+}
+
+export function _mockCubePayloadFor(chartType: ChartType): CubeResponse {
+  const months = [
+    '2025-01-01T00:00:00.000',
+    '2025-02-01T00:00:00.000',
+    '2025-03-01T00:00:00.000',
+    '2025-04-01T00:00:00.000',
+    '2025-05-01T00:00:00.000',
+    '2025-06-01T00:00:00.000',
+    '2025-07-01T00:00:00.000',
+    '2025-08-01T00:00:00.000',
+    '2025-09-01T00:00:00.000',
+    '2025-10-01T00:00:00.000',
+    '2025-11-01T00:00:00.000',
+    '2025-12-01T00:00:00.000',
+  ];
+  const baseRevenues = [12000, 15000, 18000, 22000, 19000, 24000, 28000, 26000, 32000, 35000, 40000, 42000];
+  const baseProfits = [3000, 3750, 4500, 5500, 4750, 6000, 7000, 6500, 8000, 8750, 10000, 10500];
+
+  if (chartType === 'line') {
+    return {
+      data: months.map((m, i) => ({
+        'FactSales.revenue': baseRevenues[i],
+        'FactSales.profit': baseProfits[i],
+        'FactSales.createdAt.month': m,
+      })),
+    };
+  }
+  if (chartType === 'bar') {
+    return {
+      data: [
+        { 'DimRegion.region': 'North America', 'FactSales.revenue': 168000 },
+        { 'DimRegion.region': 'Europe', 'FactSales.revenue': 126000 },
+        { 'DimRegion.region': 'Asia Pacific', 'FactSales.revenue': 95000 },
+        { 'DimRegion.region': 'Latin America', 'FactSales.revenue': 52000 },
+        { 'DimRegion.region': 'Middle East', 'FactSales.revenue': 38000 },
+        { 'DimRegion.region': 'Africa', 'FactSales.revenue': 21000 },
+      ],
+    };
+  }
+  if (chartType === 'pie') {
+    return {
+      data: [
+        { 'DimProduct.category': 'Technology', 'FactSales.revenue': 189000 },
+        { 'DimProduct.category': 'Office Supplies', 'FactSales.revenue': 147000 },
+        { 'DimProduct.category': 'Furniture', 'FactSales.revenue': 105000 },
+        { 'DimProduct.category': 'Consumer Electronics', 'FactSales.revenue': 52000 },
+        { 'DimProduct.category': 'Apparel', 'FactSales.revenue': 42000 },
+        { 'DimProduct.category': 'Home & Kitchen', 'FactSales.revenue': 31000 },
+      ],
+    };
+  }
+  if (chartType === 'kpi') {
+    return {
+      data: [
+        {
+          'FactSales.revenue': 500000,
+          'FactSales.profit': 125000,
+          'FactSales.margin': 0.25,
+          'FactSales.totalOrders': 3030,
+        },
+      ],
+    };
+  }
+  return { data: [] };
+}
+
+function _getCubeRows(cubeResponse: unknown): CubeRow[] {
+  if (!cubeResponse || typeof cubeResponse !== 'object') return [];
+  const obj = cubeResponse as Record<string, unknown>;
+  const data = obj.data;
+  if (!Array.isArray(data)) return [];
+  return data.filter((item): item is CubeRow => !!item && typeof item === 'object');
+}
+
+function _getDeltas(cubeResponse: unknown): Record<string, number> | undefined {
+  if (!cubeResponse || typeof cubeResponse !== 'object') return undefined;
+  const obj = cubeResponse as Record<string, unknown>;
+  const deltas = obj._deltas_pct;
+  if (deltas && typeof deltas === 'object') {
+    const out: Record<string, number> = {};
+    for (const [k, v] of Object.entries(deltas as Record<string, unknown>)) {
+      out[k.toLowerCase()] = _toNumber(v);
+    }
+    return out;
+  }
+  return undefined;
 }
 
 export function buildVisualizationPayload(
@@ -198,7 +488,7 @@ export function buildVisualizationPayload(
     return {
       intent,
       chartType: 'none',
-      dataSource: 'demo',
+      dataSource: 'semantic',
       errorMessage: fallbackData
         ? undefined
         : 'This question type is not yet supported for automatic visualization.',
@@ -206,30 +496,89 @@ export function buildVisualizationPayload(
   }
 
   const chartType: ChartType = intent.chartType;
-  const payload: VisualizationPayload = {
+  const basePayload: VisualizationPayload = {
     intent,
     chartType,
-    dataSource: 'demo',
+    dataSource: 'semantic',
   };
 
-  switch (chartType) {
-    case 'line':
-      payload.line = resolveLineDataset(intent);
-      break;
-    case 'bar':
-      payload.bar = resolveBarDataset(intent);
-      break;
-    case 'pie':
-      payload.pie = resolvePieDataset(intent);
-      break;
-    case 'kpi':
-      payload.kpis = resolveKPIs(intent);
-      break;
-    default:
-      break;
+  if (!_cubeResponse || _cubeResponse === null) {
+    const waiting: VisualizationPayload = { ...basePayload };
+    if (chartType === 'kpi') {
+      waiting.kpis = _waitingKPIs();
+    } else {
+      waiting.kpis = _waitingKPIs();
+      waiting.chartType = 'kpi';
+    }
+    return waiting;
   }
 
-  return payload;
+  try {
+    const rows = _getCubeRows(_cubeResponse);
+    const deltas = _getDeltas(_cubeResponse);
+
+    if (rows.length === 0) {
+      const empty: VisualizationPayload = { ...basePayload };
+      switch (chartType) {
+        case 'line':
+          empty.line = _emptyLineChart();
+          break;
+        case 'bar':
+          empty.bar = _emptyBarChart();
+          break;
+        case 'pie':
+          empty.pie = _emptyPieChart();
+          break;
+        case 'kpi':
+          empty.kpis = _emptyKPIs();
+          break;
+        default:
+          empty.kpis = _emptyKPIs();
+      }
+      empty.errorMessage = 'Insufficient data returned from Cube';
+      return empty;
+    }
+
+    const payload: VisualizationPayload = { ...basePayload };
+    switch (chartType) {
+      case 'line':
+        payload.line = _mapLineChart(rows, intent);
+        break;
+      case 'bar':
+        payload.bar = _mapBarChart(rows, intent);
+        break;
+      case 'pie':
+        payload.pie = _mapPieChart(rows, intent);
+        break;
+      case 'kpi':
+        payload.kpis = _mapKPIs(rows, intent, deltas);
+        break;
+      default:
+        payload.kpis = _mapKPIs(rows, intent, deltas);
+    }
+    return payload;
+  } catch (err) {
+    console.error('[VisualizationEngine] Failed to render chart from Cube data:', err);
+    const fallback: VisualizationPayload = { ...basePayload };
+    fallback.errorMessage = 'Could not render chart from Cube data';
+    switch (chartType) {
+      case 'line':
+        fallback.line = _emptyLineChart();
+        break;
+      case 'bar':
+        fallback.bar = _emptyBarChart();
+        break;
+      case 'pie':
+        fallback.pie = _emptyPieChart();
+        break;
+      case 'kpi':
+        fallback.kpis = _emptyKPIs();
+        break;
+      default:
+        fallback.kpis = _emptyKPIs();
+    }
+    return fallback;
+  }
 }
 
 export const VisualizationEngine = {

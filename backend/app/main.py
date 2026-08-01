@@ -2,20 +2,26 @@ import logging
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import Depends, FastAPI, Request, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.metrics import router as metrics_router
 from app.api.routes import router as routes_router
 from app.api.sales import router as sales_router
+from app.api.analytics import router as analytics_router
 from app.api.semantic import router as semantic_router
 from app.api.explain import router as explain_router
 from app.api.governance import router as governance_router
+from app.api.conversations import router as conversations_router
+from app.api.users import router as users_router
+from app.auth.dependencies import get_current_user, require_csrf
 from app.agents.bi_agent import BIAgent
+from app.config.settings import settings
 from app.governance.policy_engine import PolicyEngine
 from app.models.schemas import BIQuestionRequest, BIAnswerResponse
 from app.services.database import check_database_connection
@@ -37,26 +43,30 @@ app = FastAPI(
     title="MetricMind API",
     description="Agentic Business Intelligence Platform API",
     version="0.1.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_url="/openapi.json",
+    docs_url="/docs" if settings.effective_docs_enabled else None,
+    redoc_url="/redoc" if settings.effective_docs_enabled else None,
+    openapi_url="/openapi.json" if settings.effective_docs_enabled else None,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", settings.csrf_header_name],
 )
 
 app.include_router(routes_router, tags=["core"])
+app.include_router(auth_router)
 app.include_router(sales_router, prefix="/api/v1", tags=["sales"])
 app.include_router(metrics_router, prefix="/api/v1", tags=["metrics"])
+app.include_router(analytics_router, prefix="/api/v1", tags=["analytics"])
 app.include_router(health_router, prefix="/api/v1", tags=["health"])
 app.include_router(semantic_router)
 app.include_router(explain_router)
 app.include_router(governance_router)
+app.include_router(conversations_router)
+app.include_router(users_router)
 
 _POLICY = PolicyEngine()
 
@@ -92,7 +102,11 @@ def _attach_transparency(payload: dict, question: str, route: str, cube_response
 
 
 @app.post("/ask", response_model=BIAnswerResponse, tags=["BI Agent"])
-async def ask_question(request: BIQuestionRequest):
+async def ask_question(
+    request: BIQuestionRequest,
+    _: dict = Depends(get_current_user),
+    __: None = Depends(require_csrf),
+):
     """
     Ask a natural language business question to the BI Agent.
     The question first passes through the Day 16 Governance Policy Engine
@@ -100,6 +114,11 @@ async def ask_question(request: BIQuestionRequest):
     Cube.dev Semantic API — direct SQL or database access is never used.
     """
     question = (request.question or "").strip()
+    if not question:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid user request: question cannot be empty",
+        )
     policy_result = _POLICY.validate(question, route="/ask")
     if not policy_result.allowed:
         payload = policy_result.as_http_error()
@@ -116,15 +135,15 @@ async def ask_question(request: BIQuestionRequest):
     except ValueError as exc:
         logger.warning("Invalid BI request: %s", exc)
         _POLICY.logger.write_error(question=question, route="/ask", error_type="ValueError", detail=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail="Invalid request") from exc
     except RuntimeError as exc:
         logger.exception("BI agent runtime failure")
         _POLICY.logger.write_error(question=question, route="/ask", error_type="RuntimeError", detail=str(exc))
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Analytics service unavailable") from exc
     except Exception as exc:
         logger.exception("Failed to process question")
         _POLICY.logger.write_error(question=question, route="/ask", error_type="Exception", detail=str(exc))
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 @app.middleware("http")

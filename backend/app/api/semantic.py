@@ -2,8 +2,9 @@
 import logging
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.auth.dependencies import get_current_user, require_csrf
 from app.models.schemas import (
     SemanticSearchRequest,
     SemanticSearchResponse
@@ -42,7 +43,11 @@ def _attach_transparency(payload: dict, question: str, cube_response: dict | Non
 
 
 @router.post("/semantic-search", response_model=SemanticSearchResponse, tags=["Semantic Search"])
-async def semantic_search(request: SemanticSearchRequest):
+async def semantic_search(
+    request: SemanticSearchRequest,
+    _: dict = Depends(get_current_user),
+    __: None = Depends(require_csrf),
+):
     """Process natural language question and return analytics insights via semantic search pipeline.
 
     Questions pass through the Day 16 Governance Policy Engine (SQL injection /
@@ -51,6 +56,11 @@ async def semantic_search(request: SemanticSearchRequest):
     """
     logger.info("Received semantic search request: %s", request.question)
     question = (request.question or "").strip()
+    if not question:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid user request: question cannot be empty",
+        )
     policy_result = _POLICY.validate(question, route="/semantic-search")
     if not policy_result.allowed:
         payload = policy_result.as_http_error()
@@ -82,7 +92,7 @@ async def semantic_search(request: SemanticSearchRequest):
             error_type="ValueError",
             detail=str(exc),
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=400, detail="Invalid request") from exc
     except RuntimeError as exc:
         logger.exception("Semantic search runtime failure")
         _POLICY.logger.write_error(
@@ -91,7 +101,7 @@ async def semantic_search(request: SemanticSearchRequest):
             error_type="RuntimeError",
             detail=str(exc),
         )
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        raise HTTPException(status_code=503, detail="Analytics service unavailable") from exc
     except Exception as exc:
         logger.exception("Semantic search failed")
         _POLICY.logger.write_error(
@@ -100,4 +110,4 @@ async def semantic_search(request: SemanticSearchRequest):
             error_type="Exception",
             detail=str(exc),
         )
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal server error") from exc

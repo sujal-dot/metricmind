@@ -9,8 +9,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth.dependencies import get_current_user, require_csrf
 from app.governance.policy_engine import PolicyEngine
 from app.models.schemas import (
     GovernanceValidationRequest,
@@ -66,6 +67,8 @@ def _decision_to_schema(
 @router.post("/validate", response_model=GovernanceValidationResponse)
 async def governance_validate(
     request: GovernanceValidationRequest,
+    _: dict = Depends(get_current_user),
+    __: None = Depends(require_csrf),
 ) -> GovernanceValidationResponse:
     """
     Validate a user question against the governance policy BEFORE sending it

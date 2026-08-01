@@ -11,46 +11,18 @@ import DateFilter from '@/components/filters/DateFilter';
 import RegionFilter from '@/components/filters/RegionFilter';
 import CategoryFilter from '@/components/filters/CategoryFilter';
 import { formatCurrency } from '@/lib/chartUtils';
+import { useAnalyticsCharts } from '@/lib/hooks';
 import type { AnalyticsFilters } from '@/types/analytics';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DATASET_MAX_DATE = '2017-12-30';
 
-const DEMO_DATA = {
-  monthlyRevenue: [12000, 15000, 18000, 22000, 19000, 24000, 28000, 26000, 32000, 35000, 40000, 42000],
-  monthlyProfit: [3000, 3750, 4500, 5500, 4750, 6000, 7000, 6500, 8000, 8750, 10000, 10500],
-  monthlyOrders: [120, 150, 180, 220, 190, 240, 280, 260, 320, 350, 400, 420],
-  regions: [
-    { name: 'North America', value: 168000 },
-    { name: 'Europe', value: 126000 },
-    { name: 'Asia Pacific', value: 95000 },
-    { name: 'Latin America', value: 52000 },
-    { name: 'Middle East', value: 38000 },
-    { name: 'Africa', value: 21000 },
-  ],
-  categories: [
-    { name: 'Technology', value: 189000 },
-    { name: 'Office Supplies', value: 147000 },
-    { name: 'Furniture', value: 105000 },
-    { name: 'Consumer Electronics', value: 52000 },
-    { name: 'Apparel', value: 42000 },
-    { name: 'Home & Kitchen', value: 31000 },
-  ],
-  topProducts: [
-    { name: 'Product A', value: 52000 },
-    { name: 'Product B', value: 48000 },
-    { name: 'Product C', value: 41000 },
-    { name: 'Product D', value: 36000 },
-    { name: 'Product E', value: 29000 },
-    { name: 'Product F', value: 22000 },
-  ],
-  topCustomers: [
-    { name: 'Customer A', value: 62000 },
-    { name: 'Customer B', value: 55000 },
-    { name: 'Customer C', value: 48000 },
-    { name: 'Customer D', value: 39000 },
-    { name: 'Customer E', value: 31000 },
-  ],
-};
+function EmptyChart() {
+  return (
+    <div className="flex h-80 items-center justify-center rounded-lg bg-gray-50 text-sm text-gray-500">
+      No data for the selected filters
+    </div>
+  );
+}
 
 export default function AnalyticsPage() {
   const [dateFrom, setDateFrom] = useState('');
@@ -68,6 +40,17 @@ export default function AnalyticsPage() {
   }, [dateFrom, dateTo, region, category]);
 
   const hasActiveFilters = dateFrom || dateTo || region || category;
+  const {
+    data: chartData,
+    isLoading: chartsLoading,
+    error: chartsError,
+  } = useAnalyticsCharts(filters);
+
+  const monthlyLabels = chartData?.monthly.map((point) => point.label) ?? [];
+  const monthlyRevenue = chartData?.monthly.map((point) => point.revenue) ?? [];
+  const monthlyProfit = chartData?.monthly.map((point) => point.profit) ?? [];
+  const monthlyOrders = chartData?.monthly.map((point) => point.orders) ?? [];
+  const chartError = chartsError?.message || null;
 
   const clearAllFilters = () => {
     setDateFrom('');
@@ -98,11 +81,12 @@ export default function AnalyticsPage() {
 
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Filters</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="md:col-span-2">
             <DateFilter
               dateFrom={dateFrom}
               dateTo={dateTo}
+              maxDate={DATASET_MAX_DATE}
               onDateFromChange={setDateFrom}
               onDateToChange={setDateTo}
             />
@@ -118,116 +102,164 @@ export default function AnalyticsPage() {
         <ChartContainer
           title="Monthly Revenue & Profit"
           subtitle="Revenue and profit trends over time"
+          isLoading={chartsLoading}
+          error={chartError}
         >
-          <LineChart
-            labels={MONTHS}
-            series={[
-              {
-                name: 'Revenue',
-                data: DEMO_DATA.monthlyRevenue,
-                color: '#3b82f6',
-                smooth: true,
-              },
-              {
-                name: 'Profit',
-                data: DEMO_DATA.monthlyProfit,
-                color: '#10b981',
-                smooth: true,
-              },
-            ]}
-            yAxisFormatter={(v) => formatCurrency(v)}
-          />
+          {monthlyLabels.length ? (
+            <LineChart
+              labels={monthlyLabels}
+              series={[
+                {
+                  name: 'Revenue',
+                  data: monthlyRevenue,
+                  color: '#3b82f6',
+                  smooth: true,
+                },
+                {
+                  name: 'Profit',
+                  data: monthlyProfit,
+                  color: '#10b981',
+                  smooth: true,
+                },
+              ]}
+              yAxisFormatter={(v) => formatCurrency(v)}
+            />
+          ) : (
+            <EmptyChart />
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Sales Trend (Orders)"
           subtitle="Monthly order volume"
+          isLoading={chartsLoading}
+          error={chartError}
         >
-          <LineChart
-            labels={MONTHS}
-            series={[
-              {
-                name: 'Orders',
-                data: DEMO_DATA.monthlyOrders,
-                color: '#8b5cf6',
-                smooth: true,
-              },
-            ]}
-          />
+          {monthlyLabels.length ? (
+            <LineChart
+              labels={monthlyLabels}
+              series={[
+                {
+                  name: 'Orders',
+                  data: monthlyOrders,
+                  color: '#8b5cf6',
+                  smooth: true,
+                },
+              ]}
+            />
+          ) : (
+            <EmptyChart />
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Sales by Category"
           subtitle="Revenue broken down by product category"
+          isLoading={chartsLoading}
+          error={chartError}
         >
-          <BarChart
-            labels={DEMO_DATA.categories.map((c) => c.name)}
-            data={DEMO_DATA.categories.map((c) => c.value)}
-            name="Revenue"
-            color="#8b5cf6"
-            orientation="vertical"
-            yAxisFormatter={(v) => formatCurrency(v)}
-          />
+          {chartData?.by_category.length ? (
+            <BarChart
+              labels={chartData.by_category.map((c) => c.name)}
+              data={chartData.by_category.map((c) => c.value)}
+              name="Revenue"
+              color="#8b5cf6"
+              orientation="vertical"
+              yAxisFormatter={(v) => formatCurrency(v)}
+            />
+          ) : (
+            <EmptyChart />
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Sales by Region"
           subtitle="Revenue broken down by geographic region"
+          isLoading={chartsLoading}
+          error={chartError}
         >
-          <BarChart
-            labels={DEMO_DATA.regions.map((r) => r.name)}
-            data={DEMO_DATA.regions.map((r) => r.value)}
-            name="Revenue"
-            color="#10b981"
-            orientation="horizontal"
-            xAxisFormatter={(v) => formatCurrency(v)}
-          />
+          {chartData?.by_region.length ? (
+            <BarChart
+              labels={chartData.by_region.map((r) => r.name)}
+              data={chartData.by_region.map((r) => r.value)}
+              name="Revenue"
+              color="#10b981"
+              orientation="horizontal"
+              xAxisFormatter={(v) => formatCurrency(v)}
+            />
+          ) : (
+            <EmptyChart />
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Revenue by Category Distribution"
           subtitle="Percentage share of revenue across categories"
+          isLoading={chartsLoading}
+          error={chartError}
         >
-          <PieChart data={DEMO_DATA.categories} showPercentage={true} />
+          {chartData?.by_category.length ? (
+            <PieChart data={chartData.by_category} showPercentage={true} />
+          ) : (
+            <EmptyChart />
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Revenue by Region Distribution"
           subtitle="Percentage share of revenue across regions"
+          isLoading={chartsLoading}
+          error={chartError}
         >
-          <PieChart data={DEMO_DATA.regions} showPercentage={true} />
+          {chartData?.by_region.length ? (
+            <PieChart data={chartData.by_region} showPercentage={true} />
+          ) : (
+            <EmptyChart />
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Top Products by Sales"
           subtitle="Highest revenue-generating products"
           className="xl:col-span-2"
+          isLoading={chartsLoading}
+          error={chartError}
         >
-          <BarChart
-            labels={DEMO_DATA.topProducts.map((p) => p.name)}
-            data={DEMO_DATA.topProducts.map((p) => p.value)}
-            name="Revenue"
-            color="#f59e0b"
-            orientation="horizontal"
-            xAxisFormatter={(v) => formatCurrency(v)}
-            height="360px"
-          />
+          {chartData?.top_products.length ? (
+            <BarChart
+              labels={chartData.top_products.map((p) => p.name)}
+              data={chartData.top_products.map((p) => p.value)}
+              name="Revenue"
+              color="#f59e0b"
+              orientation="horizontal"
+              xAxisFormatter={(v) => formatCurrency(v)}
+              height="360px"
+            />
+          ) : (
+            <EmptyChart />
+          )}
         </ChartContainer>
 
         <ChartContainer
           title="Top Customers by Revenue"
           subtitle="Highest value customers"
           className="xl:col-span-2"
+          isLoading={chartsLoading}
+          error={chartError}
         >
-          <BarChart
-            labels={DEMO_DATA.topCustomers.map((c) => c.name)}
-            data={DEMO_DATA.topCustomers.map((c) => c.value)}
-            name="Revenue"
-            color="#06b6d4"
-            orientation="horizontal"
-            xAxisFormatter={(v) => formatCurrency(v)}
-            height="340px"
-          />
+          {chartData?.top_customers.length ? (
+            <BarChart
+              labels={chartData.top_customers.map((c) => c.name)}
+              data={chartData.top_customers.map((c) => c.value)}
+              name="Revenue"
+              color="#06b6d4"
+              orientation="horizontal"
+              xAxisFormatter={(v) => formatCurrency(v)}
+              height="340px"
+            />
+          ) : (
+            <EmptyChart />
+          )}
         </ChartContainer>
       </div>
     </div>

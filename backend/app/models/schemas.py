@@ -25,13 +25,38 @@ class SalesListResponse(BaseModel):
     offset: int
 
 
-class MetricsResponse(BaseModel):
+class MetricsBase(BaseModel):
     total_revenue: float
     total_profit: float
     profit_margin: float
     total_orders: int
     total_customers: int
     average_order_value: float
+
+
+class MetricsResponse(MetricsBase):
+    prior_metrics: Optional[MetricsBase] = None
+    period_change_pct: Dict[str, Optional[float]] = Field(default_factory=dict)
+
+
+class MonthlyAnalyticsPoint(BaseModel):
+    label: str
+    revenue: float
+    profit: float
+    orders: int
+
+
+class AnalyticsDataPoint(BaseModel):
+    name: str
+    value: float
+
+
+class AnalyticsChartsResponse(BaseModel):
+    monthly: List[MonthlyAnalyticsPoint]
+    by_category: List[AnalyticsDataPoint]
+    by_region: List[AnalyticsDataPoint]
+    top_products: List[AnalyticsDataPoint]
+    top_customers: List[AnalyticsDataPoint]
 
 
 class ErrorResponse(BaseModel):
@@ -46,7 +71,12 @@ class PaginatedResponse(BaseModel, Generic[T]):
 
 
 class BIQuestionRequest(BaseModel):
-    question: str = Field(..., json_schema_extra={"example": "What was the total revenue last month?"})
+    question: str = Field(
+        ...,
+        min_length=1,
+        max_length=4000,
+        json_schema_extra={"example": "What was the total revenue last month?"},
+    )
 
 
 class BIAnswerResponse(BaseModel):
@@ -65,7 +95,12 @@ class BIAnswerResponse(BaseModel):
 
 
 class SemanticSearchRequest(BaseModel):
-    question: str = Field(..., json_schema_extra={"example": "Show monthly revenue for 2025"})
+    question: str = Field(
+        ...,
+        min_length=1,
+        max_length=4000,
+        json_schema_extra={"example": "Show monthly revenue for 2025"},
+    )
 
 
 class SemanticSearchIntent(BaseModel):
@@ -116,6 +151,8 @@ class ExplainSummary(BaseModel):
 class ExplainRequest(BaseModel):
     question: str = Field(
         ...,
+        min_length=1,
+        max_length=4000,
         json_schema_extra={"example": "Why did European margin decrease?"},
     )
 
@@ -164,10 +201,13 @@ class ExplainResponse(BaseModel):
 class GovernanceValidationRequest(BaseModel):
     question: str = Field(
         ...,
+        min_length=1,
+        max_length=4000,
         json_schema_extra={"example": "SELECT * FROM Orders"},
     )
     route: Optional[str] = Field(
         None,
+        max_length=255,
         json_schema_extra={"example": "/ask"},
         description="Optional endpoint the question is targeted at, for logging.",
     )
@@ -204,4 +244,3 @@ class CubeTraceSchema(BaseModel):
     execution_time_ms: float = Field(..., json_schema_extra={"example": 245.18})
     response_status: int = Field(..., json_schema_extra={"example": 200})
     response_size_bytes: int = Field(..., json_schema_extra={"example": 3892})
-
