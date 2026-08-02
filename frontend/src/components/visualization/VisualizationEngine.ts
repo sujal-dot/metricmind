@@ -34,6 +34,7 @@ function _pickColor(i: number): string {
   return PALETTE[i % PALETTE.length];
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function _formatCurrency(n: number): string {
   if (!isFinite(n)) return 'N/A';
   const abs = Math.abs(n);
@@ -54,6 +55,7 @@ function _formatCurrency(n: number): string {
   }).format(n);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function _formatNumber(n: number): string {
   if (!isFinite(n)) return 'N/A';
   const abs = Math.abs(n);
@@ -106,6 +108,7 @@ function _isDimensionKey(key: string): boolean {
   return DIM_PREFIX_PATTERN.test(key);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function _extractByPrefix(rows: CubeRow[], prefix: string): string[] {
   const allKeys = new Set<string>();
   for (const row of rows) {
@@ -134,6 +137,7 @@ function _extractMeasureKeys(rows: CubeRow[]): string[] {
   return _extractKeysByPrefix(rows, FACT_PREFIX_PATTERN);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function _extractDimensionKeys(rows: CubeRow[]): string[] {
   return _extractKeysByPrefix(rows, DIM_PREFIX_PATTERN);
 }

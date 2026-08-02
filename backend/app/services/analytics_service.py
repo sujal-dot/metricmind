@@ -34,13 +34,13 @@ class AnalyticsService:
             "measures": ["FactSales.revenue", "FactSales.profit", "FactSales.totalOrders"],
             "timeDimensions": [
                 {
-                    "dimension": "FactSales.createdAt",
+                    "dimension": "DimDate.fullDate",
                     "granularity": "month",
                     **({"dateRange": time_dimensions[0]["dateRange"]} if time_dimensions else {}),
                 }
             ],
             "filters": filters,
-            "order": {"FactSales.createdAt": "asc"},
+            "order": {"DimDate.fullDate": "asc"},
         }
 
         by_category_query = {
@@ -67,7 +67,7 @@ class AnalyticsService:
             "timeDimensions": time_dimensions,
             "filters": filters,
             "order": {"FactSales.revenue": "desc"},
-            "limit": 10,
+            "limit": 50,
         }
 
         top_customers_query = {
@@ -76,7 +76,7 @@ class AnalyticsService:
             "timeDimensions": time_dimensions,
             "filters": filters,
             "order": {"FactSales.revenue": "desc"},
-            "limit": 10,
+            "limit": 50,
         }
 
         coros = [
@@ -140,7 +140,7 @@ class AnalyticsService:
             date_range.append("2999-12-31")
 
         return [{
-            "dimension": "FactSales.createdAt",
+            "dimension": "DimDate.fullDate",
             "dateRange": date_range,
         }]
 
@@ -148,7 +148,7 @@ class AnalyticsService:
     def _shape_monthly(rows: list[dict]) -> list[dict]:
         result = []
         for row in rows:
-            time_val = row.get("FactSales.createdAt.month") or row.get("FactSales.createdAt")
+            time_val = row.get("DimDate.fullDate.month") or row.get("DimDate.fullDate")
             label = AnalyticsService._format_month_label(time_val)
 
             revenue = float(row.get("FactSales.revenue") or 0)

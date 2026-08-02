@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import type {
+  JsonObject,
   MetricsResponse,
   SalesListResponse,
   BIAnswerResponse,
@@ -69,7 +70,7 @@ type ConversationWithMessagesResponse = {
     role: string;
     content: string;
     created_at: string;
-    metadata?: Record<string, unknown>;
+    metadata?: JsonObject;
   }>;
 };
 
@@ -78,7 +79,7 @@ type MessageResponse = {
   role: string;
   content: string;
   created_at: string;
-  metadata?: Record<string, unknown>;
+  metadata?: JsonObject;
 };
 
 type EnsureDevUserResponse = {
@@ -91,6 +92,15 @@ type EnsureDevUserResponse = {
 
 export const api = {
   getHealth: async () => apiClient.get('/api/v1/health'),
+
+  register: async (email: string, password: string, fullName?: string): Promise<{ user: User }> => {
+    const response = await apiClient.post<{ user: User }>('/api/v1/auth/register', {
+      email,
+      password,
+      full_name: fullName,
+    });
+    return response.data;
+  },
 
   login: async (email: string, password: string): Promise<{ user: User }> => {
     const response = await apiClient.post<{ user: User }>('/api/v1/auth/login', { email, password });
@@ -216,7 +226,7 @@ export const api = {
 
   appendMessage: async (
     id: string,
-    msg: { role: string; content: string; metadata?: Record<string, unknown> }
+    msg: { role: string; content: string; metadata?: JsonObject }
   ): Promise<MessageResponse> => {
     const response = await apiClient.post<MessageResponse>(
       `/api/v1/conversations/${encodeURIComponent(id)}/messages`,

@@ -76,3 +76,7 @@ dbt/profiles.yml
 .DS_Store
 Thumbs.db
 
+# Runtime / Temporary
+cookies.txt
+cube/.cubestore/
+.claude/

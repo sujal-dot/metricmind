@@ -10,10 +10,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app.api.semantic as semantic_api_module
 from app.main import app
+from app.auth.dependencies import get_current_user, require_csrf
 from app.semantic.intent_detector import IntentDetector
 from app.semantic.query_parser import QueryParser
 from app.semantic.response_formatter import ResponseFormatter
 from app.semantic.semantic_router import SemanticRouter
+
+app.dependency_overrides[get_current_user] = lambda: {
+    "id": 1,
+    "email": "test@example.com",
+    "role": "admin",
+    "is_active": True,
+}
+app.dependency_overrides[require_csrf] = lambda: None
 
 client = TestClient(app)
 

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import HistoryTable from '@/components/HistoryTable';
-import Loading from '@/components/Loading';
 import type { HistoryItem } from '@/types/api';
 import type { Conversation, ChatMessage } from '@/types/chat';
 import { api } from '@/lib/api';
@@ -106,21 +105,25 @@ export default function HistoryPage() {
         setError(null);
         setUsingFallback(false);
 
-        try {
-          await api.ensureDevUser('dev@metricmind.ai');
-        } catch (ensureErr) {
-          console.warn('[history] ensureDevUser failed, attempting list anyway', ensureErr);
-        }
-
         const convs = await api.listConversations();
 
+        // Use a parallel limit to avoid N+1 slow sequential fetches, but batch them.
         const hydrated: Array<Conversation & { messages: ChatMessage[] }> = [];
-        for (const c of convs) {
-          try {
-            const full = await api.getConversation(c.id);
-            hydrated.push(full);
-          } catch (hydErr) {
-            console.warn(`[history] Failed to hydrate conversation ${c.id}`, hydErr);
+        const BATCH_SIZE = 5;
+        for (let i = 0; i < convs.length; i += BATCH_SIZE) {
+          const batch = convs.slice(i, i + BATCH_SIZE);
+          const results = await Promise.all(
+            batch.map(async (c) => {
+              try {
+                return await api.getConversation(c.id);
+              } catch (hydErr) {
+                console.warn(`[history] Failed to hydrate conversation ${c.id}`, hydErr);
+                return null;
+              }
+            })
+          );
+          for (const res of results) {
+            if (res) hydrated.push(res);
           }
         }
 

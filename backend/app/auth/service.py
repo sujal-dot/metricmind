@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from app.auth.passwords import verify_password
+from app.auth.passwords import verify_password, hash_password
 from app.config.settings import settings
 
 
@@ -32,6 +32,34 @@ def _row_to_user(row: Any) -> dict:
 class AuthService:
     def __init__(self, engine: Engine):
         self.engine = engine
+
+    def register_user(self, email: str, password: str, full_name: str | None = None) -> dict | None:
+        normalized = email.strip().lower()
+        if not normalized or not password:
+            return None
+        hashed = hash_password(password)
+        with self.engine.begin() as conn:
+            existing = conn.execute(
+                text("SELECT id FROM users WHERE LOWER(email) = :email"),
+                {"email": normalized},
+            ).fetchone()
+            if existing is not None:
+                return None
+            row = conn.execute(
+                text(
+                    """
+                    INSERT INTO users (email, full_name, hashed_password, role, is_active, created_at, updated_at)
+                    VALUES (:email, :full_name, :hashed_password, 'viewer', TRUE, NOW(), NOW())
+                    RETURNING id, email, full_name, role, is_active
+                    """
+                ),
+                {
+                    "email": normalized,
+                    "full_name": full_name.strip() if full_name else None,
+                    "hashed_password": hashed,
+                },
+            ).fetchone()
+        return _row_to_user(row) if row is not None else None
 
     def authenticate_user(self, email: str, password: str) -> dict | None:
         normalized = email.strip().lower()

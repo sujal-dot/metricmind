@@ -52,7 +52,7 @@ export default function Navbar() {
             </svg>
           )}
         </button>
-        <h2 className="text-lg font-semibold text-gray-900">Business Intelligence</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Dashboard</h2>
       </div>
       <div className="flex items-center gap-4">
         {user && (

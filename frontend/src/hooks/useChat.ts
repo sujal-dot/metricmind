@@ -240,8 +240,8 @@ export function useChat() {
                   return {
                     ...m,
                     relatedQuestion: existing?.relatedQuestion,
-                    cube_trace: existing?.cube_trace ?? m.metadata?.cube_trace ?? undefined,
-                    cube_json: existing?.cube_json ?? m.metadata?.cube_json ?? undefined,
+                    cube_trace: existing?.cube_trace ?? ((m.metadata?.cube_trace as unknown) as CubeTrace | undefined) ?? undefined,
+                    cube_json: existing?.cube_json ?? ((m.metadata?.cube_json as unknown) as JsonObject | undefined) ?? undefined,
                     policy_violation: existing?.policy_violation,
                   };
                 }),
@@ -250,7 +250,7 @@ export function useChat() {
                 (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
               );
             });
-          } catch (err) {
+          } catch (err: unknown) {
             if (typeof console !== 'undefined') {
               console.warn(BACKEND_FAIL_WARN + ' (getConversation on select)', err);
             }
@@ -314,7 +314,7 @@ export function useChat() {
         try {
           const validation = await api.governanceValidate({ question, route: '/ask' });
           decision = validation.decision;
-        } catch (err) {
+        } catch (err: unknown) {
           throw new Error('Unable to validate this request with governance. Please retry.');
         }
 
@@ -338,7 +338,7 @@ export function useChat() {
               role: blockedMessage.role,
               content: blockedMessage.content,
               metadata: {
-                relatedQuestion: blockedMessage.relatedQuestion,
+                ...(blockedMessage.relatedQuestion ? { relatedQuestion: blockedMessage.relatedQuestion } : {}),
                 policy_violation: (blockedMessage.policy_violation as unknown) as JsonObject,
               },
             }),
@@ -429,7 +429,7 @@ export function useChat() {
       (async () => {
         try {
           await api.deleteConversation(cid);
-        } catch (err) {
+        } catch (err: unknown) {
           if (typeof console !== 'undefined') {
             console.warn(BACKEND_FAIL_WARN + ' (deleteConversation)', err);
           }
@@ -452,7 +452,7 @@ export function useChat() {
         try {
           const list = await api.listConversations();
           await Promise.all(list.map((c) => api.deleteConversation(c.id).catch(() => undefined)));
-        } catch (err) {
+        } catch (err: unknown) {
           if (typeof console !== 'undefined') {
             console.warn(BACKEND_FAIL_WARN + ' (deleteAllConversations)', err);
           }

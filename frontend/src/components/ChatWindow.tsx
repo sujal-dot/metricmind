@@ -89,7 +89,13 @@ export default function ChatWindow() {
               {messages.map((message) => (
                 <div key={message.id}>
                   <ChatMessage message={message} />
-                  {message.role === 'assistant' && message.relatedQuestion ? (
+                  {message.role === 'assistant' && message.relatedQuestion && message.cube_json ? (
+                    <VisualizationMessage
+                      userQuestion={message.relatedQuestion}
+                      assistantAnswer={message.content}
+                      cubeResponse={message.cube_json as Record<string, unknown>}
+                    />
+                  ) : message.role === 'assistant' && message.relatedQuestion ? (
                     <VisualizationMessage
                       userQuestion={message.relatedQuestion}
                       assistantAnswer={message.content}

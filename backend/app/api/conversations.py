@@ -119,7 +119,7 @@ async def create_conversation(
 
 
 def _get_conversation_owner(conn: Any, conversation_id: str) -> Optional[int]:
-    sql = text("SELECT user_id FROM conversations WHERE id = :id::uuid")
+    sql = text("SELECT user_id FROM conversations WHERE id = CAST(:id AS uuid)")
     row = conn.execute(sql, {"id": conversation_id}).fetchone()
     return row.user_id if row else None
 
@@ -142,7 +142,7 @@ async def get_conversation(
             conv_sql = text(
                 """
                 SELECT id, title, created_at, updated_at
-                FROM conversations WHERE id = :id::uuid
+                FROM conversations WHERE id = CAST(:id AS uuid)
                 """
             )
             conv_row = conn.execute(conv_sql, {"id": str(conversation_id)}).fetchone()
@@ -152,7 +152,7 @@ async def get_conversation(
                 """
                 SELECT id, role, content, metadata, created_at
                 FROM messages
-                WHERE conversation_id = :id::uuid
+                WHERE conversation_id = CAST(:id AS uuid)
                 ORDER BY created_at ASC, id ASC
                 """
             )
@@ -160,7 +160,7 @@ async def get_conversation(
             conv["messages"] = [_message_row_to_dict(r) for r in msg_rows]
 
             count_sql = text(
-                "SELECT COUNT(*)::INTEGER AS cnt FROM messages WHERE conversation_id = :id::uuid"
+                "SELECT COUNT(*)::INTEGER AS cnt FROM messages WHERE conversation_id = CAST(:id AS uuid)"
             )
             count_row = conn.execute(count_sql, {"id": str(conversation_id)}).fetchone()
             conv["message_count"] = count_row.cnt if count_row else len(conv["messages"])
@@ -195,7 +195,7 @@ async def update_conversation(
                 UPDATE conversations
                 SET title = COALESCE(:title, title),
                     updated_at = NOW()
-                WHERE id = :id::uuid
+                WHERE id = CAST(:id AS uuid)
                 RETURNING id, title, created_at, updated_at
                 """
             )
@@ -230,7 +230,7 @@ async def delete_conversation(
             if owner != u["id"]:
                 raise HTTPException(status_code=403, detail="Forbidden")
 
-            sql = text("DELETE FROM conversations WHERE id = :id::uuid")
+            sql = text("DELETE FROM conversations WHERE id = CAST(:id AS uuid)")
             conn.execute(sql, {"id": str(conversation_id)})
             return {"ok": True, "id": str(conversation_id)}
     except HTTPException:
@@ -261,7 +261,7 @@ async def append_message(
             sql = text(
                 """
                 INSERT INTO messages (conversation_id, role, content, metadata, created_at)
-                VALUES (:cid::uuid, :role, :content, :md::jsonb, NOW())
+                VALUES (CAST(:cid AS uuid), :role, :content, CAST(:md AS jsonb), NOW())
                 RETURNING id, role, content, metadata, created_at
                 """
             )
@@ -276,7 +276,7 @@ async def append_message(
             ).fetchone()
 
             up_sql = text(
-                "UPDATE conversations SET updated_at = NOW() WHERE id = :id::uuid"
+                "UPDATE conversations SET updated_at = NOW() WHERE id = CAST(:id AS uuid)"
             )
             conn.execute(up_sql, {"id": str(conversation_id)})
 

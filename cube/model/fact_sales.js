@@ -81,7 +81,7 @@ cube(`FactSales`, {
     },
     
     totalCustomers: {
-      sql: `${DimCustomer.customerKey}`,
+      sql: `customer_key`,
       type: `countDistinct`,
       title: `Total Customers`
     }

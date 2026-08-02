@@ -52,9 +52,47 @@ class CubeClient:
             logger.error("Cube.dev returned invalid JSON for %s: %s", url, exc)
             raise RuntimeError("Cube.dev returned an invalid response") from exc
 
+    @staticmethod
+    def _normalize_query(query: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(query, dict):
+            return query
+        q = dict(query)
+        time_dims = q.get("timeDimensions")
+        if isinstance(time_dims, list):
+            normalized_tds = []
+            for td in time_dims:
+                if isinstance(td, dict):
+                    td_copy = dict(td)
+                    if td_copy.get("dimension") == "FactSales.createdAt":
+                        td_copy["dimension"] = "DimDate.fullDate"
+
+                    dr = td_copy.get("dateRange")
+                    if isinstance(dr, str):
+                        dr_clean = dr.strip()
+                        if dr_clean.isdigit() and len(dr_clean) == 4:
+                            td_copy["dateRange"] = [f"{dr_clean}-01-01", f"{dr_clean}-12-31"]
+                    elif isinstance(dr, list):
+                        if len(dr) == 1 and isinstance(dr[0], str) and dr[0].strip().isdigit() and len(dr[0].strip()) == 4:
+                            yr = dr[0].strip()
+                            td_copy["dateRange"] = [f"{yr}-01-01", f"{yr}-12-31"]
+                        elif len(dr) == 2 and isinstance(dr[0], str) and isinstance(dr[1], str):
+                            d1 = dr[0].strip()
+                            d2 = dr[1].strip()
+                            if d1.isdigit() and len(d1) == 4:
+                                d1 = f"{d1}-01-01"
+                            if d2.isdigit() and len(d2) == 4:
+                                d2 = f"{d2}-12-31"
+                            td_copy["dateRange"] = [d1, d2]
+                    normalized_tds.append(td_copy)
+                else:
+                    normalized_tds.append(td)
+            q["timeDimensions"] = normalized_tds
+        return q
+
     async def load(self, query: Dict[str, Any]) -> Dict[str, Any]:
-        logger.info("Sending Cube.dev load query: %s", query)
-        result = await self._request("POST", "load", json_body={"query": query})
+        normalized_query = self._normalize_query(query)
+        logger.info("Sending Cube.dev load query: %s", normalized_query)
+        result = await self._request("POST", "load", json_body={"query": normalized_query})
         logger.info("Received Cube.dev load response with keys: %s", list(result.keys()))
         return result
 

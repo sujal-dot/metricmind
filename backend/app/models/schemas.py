@@ -73,7 +73,7 @@ class PaginatedResponse(BaseModel, Generic[T]):
 class BIQuestionRequest(BaseModel):
     question: str = Field(
         ...,
-        min_length=1,
+        min_length=0,
         max_length=4000,
         json_schema_extra={"example": "What was the total revenue last month?"},
     )
@@ -97,7 +97,7 @@ class BIAnswerResponse(BaseModel):
 class SemanticSearchRequest(BaseModel):
     question: str = Field(
         ...,
-        min_length=1,
+        min_length=0,
         max_length=4000,
         json_schema_extra={"example": "Show monthly revenue for 2025"},
     )

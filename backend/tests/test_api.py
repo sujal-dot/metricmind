@@ -8,11 +8,21 @@ from langchain_core.messages import AIMessage
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import app.main as main_module
-import app.api.routes as routes_module
+import app.services.sales_service as sales_service_module
+import app.services.metrics_service as metrics_service_module
 from app.main import app
+from app.auth.dependencies import get_current_user, require_csrf
 from app.agents.bi_agent import BIAgent
 from app.agents.llm_factory import LLMFactory
 from app.agents.prompts import BI_ANALYST_SYSTEM_PROMPT
+
+app.dependency_overrides[get_current_user] = lambda: {
+    "id": 1,
+    "email": "test@example.com",
+    "role": "admin",
+    "is_active": True,
+}
+app.dependency_overrides[require_csrf] = lambda: None
 
 client = TestClient(app)
 
@@ -26,7 +36,7 @@ def test_root_endpoint():
 
 
 def test_sales_endpoint():
-    original_service = routes_module.SalesService
+    original_service = sales_service_module.SalesService
 
     class FakeSalesService:
         def __init__(self, _db):
@@ -46,11 +56,11 @@ def test_sales_endpoint():
                 1,
             )
 
-    routes_module.SalesService = FakeSalesService
+    sales_service_module.SalesService = FakeSalesService
     try:
-        response = client.get("/sales", params={"limit": 5, "offset": 0})
+        response = client.get("/api/v1/sales", params={"limit": 5, "offset": 0})
     finally:
-        routes_module.SalesService = original_service
+        sales_service_module.SalesService = original_service
 
     assert response.status_code == 200
     payload = response.json()
@@ -68,10 +78,10 @@ def test_sales_endpoint():
 
 
 def test_metrics_endpoint():
-    original_service = routes_module.MetricsService
+    original_service = metrics_service_module.MetricsService
 
     class FakeMetricsService:
-        def get_metrics(self):
+        async def get_metrics(self, **kwargs):
             return {
                 "total_revenue": 1000.0,
                 "total_profit": 120.0,
@@ -81,11 +91,11 @@ def test_metrics_endpoint():
                 "average_order_value": 50.0,
             }
 
-    routes_module.MetricsService = FakeMetricsService
+    metrics_service_module.MetricsService = FakeMetricsService
     try:
-        response = client.get("/metrics")
+        response = client.get("/api/v1/metrics")
     finally:
-        routes_module.MetricsService = original_service
+        metrics_service_module.MetricsService = original_service
 
     assert response.status_code == 200
     payload = response.json()

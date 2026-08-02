@@ -40,7 +40,7 @@ class QueryParser:
         logger.info("Parsing semantic intent into Cube query: %s", intent.model_dump())
 
         measures = [self._metric_member(metric) for metric in intent.metrics]
-        dimensions = self._dimension_members(intent.dimensions)
+        dimensions = self._dimension_members(intent.dimensions, intent=intent)
         cube_query: Dict[str, Any] = {"measures": measures}
         if dimensions:
             cube_query["dimensions"] = dimensions
@@ -62,9 +62,12 @@ class QueryParser:
     def _metric_member(self, metric: str) -> str:
         return self.METRIC_TO_MEMBER.get(metric, "FactSales.revenue")
 
-    def _dimension_members(self, dimensions: List[str]) -> List[str]:
+    def _dimension_members(self, dimensions: List[str], intent: UserIntent | None = None) -> List[str]:
         members: List[str] = []
+        is_customer_count = intent and "customers" in intent.metrics and not intent.limit
         for dimension in dimensions:
+            if is_customer_count and dimension == "customer":
+                continue
             member = self.DIMENSION_TO_MEMBER.get(dimension)
             if member and member not in members:
                 members.append(member)

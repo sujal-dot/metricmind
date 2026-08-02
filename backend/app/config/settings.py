@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     port: int = 8000
     docs_enabled: bool | None = None
 
-    database_url: str = "postgresql://metricmind:metricmind@localhost:5433/metricmind"
+    database_url: str = "sqlite:///./dev.db"
     db_pool_size: int = Field(default=20, ge=1, le=100)
     db_max_overflow: int = Field(default=40, ge=0, le=200)
     db_pool_recycle: int = Field(default=1800, ge=60)

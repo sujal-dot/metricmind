@@ -16,6 +16,12 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=256)
 
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=6, max_length=256)
+    full_name: str | None = Field(default=None, max_length=256)
+
+
 class UserResponse(BaseModel):
     id: int
     email: EmailStr
@@ -58,6 +64,24 @@ def _set_auth_cookies(
 def _clear_auth_cookies(response: Response) -> None:
     response.delete_cookie(settings.session_cookie_name, path="/")
     response.delete_cookie(settings.csrf_cookie_name, path="/")
+
+
+@router.post("/register", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
+def register(
+    body: RegisterRequest,
+    response: Response,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> LoginResponse:
+    user = auth_service.register_user(body.email, body.password, body.full_name)
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="An account with this email already exists.",
+        )
+
+    session_token, csrf_token, expires_at = auth_service.create_session(user["id"])
+    _set_auth_cookies(response, session_token, csrf_token, expires_at)
+    return LoginResponse(user=UserResponse(**user))
 
 
 @router.post("/login", response_model=LoginResponse)

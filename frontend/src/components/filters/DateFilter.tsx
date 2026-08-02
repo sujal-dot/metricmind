@@ -27,10 +27,10 @@ export default function DateFilter({
   ];
 
   const applyPreset = (days: number) => {
-    const to = maxDate ? new Date(`${maxDate}T00:00:00`) : new Date();
-    const from = new Date();
-    from.setTime(to.getTime());
-    from.setDate(from.getDate() - days);
+    // Avoid time zone shifting: parse YYYY-MM-DD as UTC and do math in UTC
+    const to = maxDate ? new Date(`${maxDate}T00:00:00Z`) : new Date(new Date().setUTCHours(0, 0, 0, 0));
+    const from = new Date(to.getTime());
+    from.setUTCDate(to.getUTCDate() - days);
     onDateFromChange(from.toISOString().split('T')[0]);
     onDateToChange(to.toISOString().split('T')[0]);
   };
@@ -38,6 +38,20 @@ export default function DateFilter({
   const clearDates = () => {
     onDateFromChange('');
     onDateToChange('');
+  };
+
+  const handleDateFromChange = (value: string) => {
+    if (value && dateTo && value > dateTo) {
+      onDateToChange(value);
+    }
+    onDateFromChange(value);
+  };
+
+  const handleDateToChange = (value: string) => {
+    if (value && dateFrom && value < dateFrom) {
+      onDateFromChange(value);
+    }
+    onDateToChange(value);
   };
 
   return (
@@ -49,8 +63,8 @@ export default function DateFilter({
             <input
               type="date"
               value={dateFrom}
-              max={maxDate}
-              onChange={(e) => onDateFromChange(e.target.value)}
+              max={dateTo || maxDate}
+              onChange={(e) => handleDateFromChange(e.target.value)}
               className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               aria-label="From date"
             />
@@ -58,8 +72,9 @@ export default function DateFilter({
             <input
               type="date"
               value={dateTo}
+              min={dateFrom}
               max={maxDate}
-              onChange={(e) => onDateToChange(e.target.value)}
+              onChange={(e) => handleDateToChange(e.target.value)}
               className="w-full min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               aria-label="To date"
             />

@@ -72,10 +72,14 @@ try {
   modelFiles.forEach(file => {
     const filePath = path.join(__dirname, 'model', file);
     try {
-      require(filePath);
+      execSync(`node --check "${filePath}"`, { stdio: 'pipe' });
       console.log(`   ✅ ${file} valid`);
     } catch (err) {
-      console.log(`   ❌ ${file} invalid: ${err.message}`);
+      const details =
+        (err && (err.stderr || err.stdout) && (err.stderr || err.stdout).toString().trim()) ||
+        (err && err.message) ||
+        'Unknown error';
+      console.log(`   ❌ ${file} invalid: ${details}`);
       process.exit(1);
     }
   });

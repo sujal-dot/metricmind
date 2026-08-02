@@ -121,6 +121,9 @@ run() {
 _on_error() {
   local exit_code=$?
   local lineno=${1:-"?"}
+  if (( BASH_SUBSHELL > 0 )); then
+    return 0
+  fi
   print_fail "start.sh line ${lineno} exited with status ${exit_code}. See ${STARTUP_LOG}."
   log "ERROR" "Line ${lineno} exit=${exit_code}. Invoking graceful shutdown."
   shutdown || true
@@ -309,7 +312,7 @@ ensure_backend_venv_and_deps() {
   source "${venv}/bin/activate"
   # Cheap fingerprint: if our top 2 requirements import without error, skip.
   # This is ~instant compared to `pip install -r` every run.
-  if "${venv}/bin/python" -c 'import fastapi, uvicorn, pydantic, sqlalchemy, dotenv, pandas' >>"${STARTUP_LOG}" 2>&1; then
+  if "${venv}/bin/python" -c 'import fastapi, uvicorn, pydantic, sqlalchemy, dotenv, pandas, passlib' >>"${STARTUP_LOG}" 2>&1; then
     log "OK" "Backend dependencies already installed"
     return 0
   fi
@@ -332,9 +335,9 @@ ensure_node_modules() {
 
 # ---- Data seeding: one-shot if the warehouse is empty ----------------------
 database_has_data() {
-  # Use python sqlalchemy via the venv so we don't need psql on the host.
-  "${BACKEND_DIR}/venv/bin/python" - "$(grep -E '^DATABASE_URL=' "${BACKEND_DIR}/.env" | head -n1 | cut -d= -f2- | tr -d '"')" \
-    2>>"${STARTUP_LOG}" <<'PY' || exit 1
+  local url
+  url="$(grep -E '^DATABASE_URL=' "${BACKEND_DIR}/.env" 2>/dev/null | head -n1 | cut -d= -f2- | tr -d '"' || true)"
+  "${BACKEND_DIR}/venv/bin/python" - "${url}" 2>>"${STARTUP_LOG}" <<'PY' || echo "EMPTY"
 import os, sys
 url = sys.argv[1] if len(sys.argv)>1 else os.environ.get("DATABASE_URL","")
 if not url:
@@ -398,11 +401,26 @@ maybe_seed_database() {
 # ---- Lifecycle: start individual services ----------------------------------
 start_postgres() {
   print_banner "Starting PostgreSQL..."
-  # `docker compose up -d` is idempotent. If the container is already up, it is
-  # a no-op (returns 0 quickly), so STARTED_POSTGRES still gets set to 1
-  # because we "manage" it from here on for shutdown purposes.
-  run "docker compose up -d" compose up -d
-  STARTED_POSTGRES=1
+  local already_running=0
+  if docker ps --filter "name=metricmind-postgres" --format "{{.Names}}" 2>/dev/null | grep -q '^metricmind-postgres$'; then
+    already_running=1
+  fi
+
+  print_step "Starting PostgreSQL..."
+
+  if ! compose up -d postgres >>"${STARTUP_LOG}" 2>&1; then
+    print_fail "Docker Compose failed."
+    echo
+    echo "========== Docker Output =========="
+    tail -50 "${STARTUP_LOG}"
+    echo "==================================="
+    exit 2
+  fi
+  if [[ "${already_running}" == "1" ]]; then
+    STARTED_POSTGRES=0
+  else
+    STARTED_POSTGRES=1
+  fi
   print_step "Waiting for PostgreSQL (healthy)"
   if wait_for_postgres_healthy "${POSTGRES_HEALTH_TIMEOUT}"; then
     print_ok_over "PostgreSQL Ready"
@@ -453,6 +471,13 @@ start_backend() {
   print_banner "Starting Backend..."
   # ensure venv + deps are ready (idempotent)
   ensure_backend_venv_and_deps
+
+  if curl -fs "http://localhost:${BACKEND_PORT}/docs" >/dev/null 2>&1; then
+    print_ok "Backend already running on port ${BACKEND_PORT}"
+    STARTED_BACKEND=0
+    return 0
+  fi
+
   (
     cd "${BACKEND_DIR}"
     nohup uvicorn app.main:app --host 0.0.0.0 --port "${BACKEND_PORT}" --reload \
@@ -473,6 +498,13 @@ start_backend() {
 start_frontend() {
   print_banner "Starting Frontend..."
   ensure_node_modules "${FRONTEND_DIR}" "Frontend"
+
+  if curl -fs "http://localhost:${FRONTEND_PORT}" >/dev/null 2>&1; then
+    print_ok "Frontend already running on port ${FRONTEND_PORT}"
+    STARTED_FRONTEND=0
+    return 0
+  fi
+
   # Note: Next.js `next dev` writes to both stdout and stderr; capture both.
   (
     cd "${FRONTEND_DIR}"
@@ -526,6 +558,8 @@ shutdown() {
     return 0
   fi
   SHUTTING_DOWN=1
+  set +e
+  trap - ERR
 
   local now now_iso dur
   now="$(date)"
@@ -556,9 +590,9 @@ shutdown() {
   fi
 
   if [[ "${STARTED_POSTGRES:-0}" == "1" ]]; then
-    ( compose down >>"${STARTUP_LOG}" 2>&1 || true )
+    ( compose stop postgres >>"${STARTUP_LOG}" 2>&1 || true )
     print_ok "PostgreSQL Stopped"
-    log "STOP" "PostgreSQL via docker compose down"
+    log "STOP" "PostgreSQL via docker compose stop postgres"
   fi
 
   log "END" "Shutdown at ${now} (${now_iso}). Total runtime ${dur}s."

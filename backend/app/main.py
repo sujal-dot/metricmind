@@ -165,6 +165,11 @@ def startup_event() -> None:
     logger.info("MetricMind backend starting up")
     if check_database_connection():
         logger.info("PostgreSQL connection successful")
+        try:
+            from app.services.migrations import run_migrations_upgrade
+            run_migrations_upgrade()
+        except Exception:
+            logger.exception("Failed to run migrations on startup")
     else:
         logger.error("PostgreSQL connection failed")
 

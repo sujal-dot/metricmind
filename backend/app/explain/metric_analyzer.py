@@ -319,7 +319,7 @@ class MetricAnalyzer:
         time_dimensions: List[Dict[str, Any]] = []
         if date_from and date_to:
             time_dimensions.append({
-                "dimension": "FactSales.createdAt",
+                "dimension": "DimDate.fullDate",
                 "dateRange": [date_from.isoformat(), date_to.isoformat()],
             })
 

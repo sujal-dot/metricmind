@@ -111,7 +111,7 @@ class MetricsService:
             date_range.append("2999-12-31")
 
         return [{
-            "dimension": "FactSales.createdAt",
+            "dimension": "DimDate.fullDate",
             "dateRange": date_range,
         }]
 
@@ -127,7 +127,7 @@ class MetricsService:
         prior_date_from = prior_date_to - timedelta(days=days - 1)
 
         return [{
-            "dimension": "FactSales.createdAt",
+            "dimension": "DimDate.fullDate",
             "dateRange": [prior_date_from.isoformat(), prior_date_to.isoformat()],
         }]
 

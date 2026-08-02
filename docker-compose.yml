@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: metricmind
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-generate-32-bytes}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-metricmind}
       POSTGRES_DB: metricmind
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -37,8 +37,8 @@ services:
       CUBEJS_DB_PORT: "5432"
       CUBEJS_DB_NAME: metricmind
       CUBEJS_DB_USER: metricmind
-      CUBEJS_DB_PASS: ${POSTGRES_PASSWORD:-change-me-generate-32-bytes}
-      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-change-me-generate-32-bytes}
+      CUBEJS_DB_PASS: ${POSTGRES_PASSWORD:-metricmind}
+      CUBEJS_API_SECRET: ${CUBEJS_API_SECRET:-metricmind}
       CUBEJS_CACHE_AND_QUERY_DRIVER: postgres
       CUBEJS_WEB_SOCKETS: "true"
     ports:
@@ -68,10 +68,10 @@ services:
       DEBUG: "False"
       HOST: 0.0.0.0
       PORT: "8000"
-      DATABASE_URL: postgresql://metricmind:${POSTGRES_PASSWORD:-change-me-generate-32-bytes}@postgres:5432/metricmind
+      DATABASE_URL: postgresql://metricmind:${POSTGRES_PASSWORD:-metricmind}@postgres:5432/metricmind
       CUBE_API_URL: http://cube:4000/cubejs-api/v1
-      CUBE_API_SECRET: ${CUBEJS_API_SECRET:-change-me-generate-32-bytes}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-generate-32-bytes}
+      CUBE_API_SECRET: ${CUBEJS_API_SECRET:-metricmind}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-metricmind}
       JWT_ALGORITHM: HS256
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "1440"
       LLM_PROVIDER: ${LLM_PROVIDER:-groq}
