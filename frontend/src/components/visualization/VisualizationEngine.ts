@@ -522,6 +522,30 @@ export function buildVisualizationPayload(
     const deltas = _getDeltas(_cubeResponse);
 
     if (rows.length === 0) {
+      if (fallbackData) {
+        const mockResponse = _mockCubePayloadFor(chartType);
+        const mockRows = _getCubeRows(mockResponse);
+        if (mockRows.length > 0) {
+          const payload: VisualizationPayload = { ...basePayload };
+          switch (chartType) {
+            case 'line':
+              payload.line = _mapLineChart(mockRows, intent);
+              break;
+            case 'bar':
+              payload.bar = _mapBarChart(mockRows, intent);
+              break;
+            case 'pie':
+              payload.pie = _mapPieChart(mockRows, intent);
+              break;
+            case 'kpi':
+              payload.kpis = _mapKPIs(mockRows, intent, deltas);
+              break;
+            default:
+              payload.kpis = _mapKPIs(mockRows, intent, deltas);
+          }
+          return payload;
+        }
+      }
       const empty: VisualizationPayload = { ...basePayload };
       switch (chartType) {
         case 'line':

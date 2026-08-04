@@ -1,3 +1,4 @@
+import json
 import logging
 import time
 from collections.abc import Sequence
@@ -50,12 +51,19 @@ class BIAgent:
                 )
 
             tool_messages = []
+            last_cube_response = None
             for tool_call in planner_response.tool_calls:
                 tool_name = tool_call["name"]
                 tool = self.tool_map.get(tool_name)
                 if tool is None:
                     raise ValueError(f"Unsupported tool requested by agent: {tool_name}")
                 tool_result = await tool.ainvoke(tool_call["args"])
+                try:
+                    parsed = json.loads(tool_result) if isinstance(tool_result, str) else tool_result
+                    if isinstance(parsed, dict) and ("data" in parsed or "query" in parsed):
+                        last_cube_response = parsed
+                except Exception:
+                    pass
                 tool_messages.append(
                     ToolMessage(
                         content=tool_result,
@@ -80,12 +88,15 @@ class BIAgent:
             logger.info("Agent response generated in %.4fs", duration)
             logger.info("Agent answer: %s", answer)
 
-            return {
+            result_payload = {
                 "question": question,
                 "answer": answer,
                 "source": "Cube API",
                 "provider": self.provider,
             }
+            if last_cube_response:
+                result_payload["cube_response"] = last_cube_response
+            return result_payload
         except Exception:
             logger.exception("Error processing question: %s", question)
             raise
