@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from dataclasses import dataclass
 
 from app.explain.metric_analyzer import MetricSnapshot
 
@@ -16,12 +15,12 @@ class RootCauseFinding:
 
     reason_text: str
     evidence_metric: str
-    evidence_value_pct: Optional[float]
+    evidence_value_pct: float | None
     weight: float  # 0.0 - 1.0, how strong the evidence is
     supported: bool = True
 
 
-PRIMARY_METRIC_CAUSE_TEMPLATES: Dict[str, List[Dict[str, object]]] = {
+PRIMARY_METRIC_CAUSE_TEMPLATES: dict[str, list[dict[str, object]]] = {
     "margin": [
         {
             "trigger": "shipping_cost",
@@ -226,11 +225,11 @@ class RootCauseAnalyzer:
 
     TEMPLATES = PRIMARY_METRIC_CAUSE_TEMPLATES
 
-    def analyze(self, snapshot: MetricSnapshot) -> List[RootCauseFinding]:
+    def analyze(self, snapshot: MetricSnapshot) -> list[RootCauseFinding]:
         primary = snapshot.primary_metric or "margin"
         templates = self.TEMPLATES.get(primary) or self.TEMPLATES["margin"]
 
-        findings: List[RootCauseFinding] = []
+        findings: list[RootCauseFinding] = []
 
         for template in templates:
             trigger: str = template["trigger"]  # type: ignore[assignment]

@@ -8,8 +8,8 @@ Wraps downstream calls (LangChain agent, Cube API) and:
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, Optional
+from dataclasses import asdict, dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -18,14 +18,14 @@ class CubeAPITrace:
 
     endpoint: str
     method: str
-    request_payload: Dict[str, Any] = field(default_factory=dict)
-    query_parameters: Dict[str, Any] = field(default_factory=dict)
+    request_payload: dict[str, Any] = field(default_factory=dict)
+    query_parameters: dict[str, Any] = field(default_factory=dict)
     execution_time_ms: float = 0.0
     response_status: int = 0
     response_size_bytes: int = 0
-    response_json: Optional[Dict[str, Any]] = None
+    response_json: dict[str, Any] | None = None
 
-    def for_view_api(self) -> Dict[str, Any]:
+    def for_view_api(self) -> dict[str, Any]:
         payload = {
             "endpoint": self.endpoint,
             "method": self.method,
@@ -37,7 +37,7 @@ class CubeAPITrace:
         }
         return payload
 
-    def for_view_json(self) -> Dict[str, Any]:
+    def for_view_json(self) -> dict[str, Any]:
         if self.response_json is None:
             return {}
         return self._redact(self.response_json)
@@ -64,7 +64,7 @@ class QueryGuard:
     """
 
     def __init__(self) -> None:
-        self._trace: Optional[CubeAPITrace] = None
+        self._trace: CubeAPITrace | None = None
 
     # ------------------------------------------------------------------
     # Context manager-style trace helpers — caller provides Cube payload
@@ -73,8 +73,8 @@ class QueryGuard:
         self,
         endpoint: str,
         method: str = "POST",
-        query_parameters: Optional[Dict[str, Any]] = None,
-        request_payload: Optional[Dict[str, Any]] = None,
+        query_parameters: dict[str, Any] | None = None,
+        request_payload: dict[str, Any] | None = None,
     ) -> None:
         self._trace = CubeAPITrace(
             endpoint=endpoint,
@@ -85,10 +85,10 @@ class QueryGuard:
 
     def complete_trace(
         self,
-        response_json: Optional[Dict[str, Any]],
+        response_json: dict[str, Any] | None,
         *,
         status: int = 200,
-        started_at: Optional[float] = None,
+        started_at: float | None = None,
     ) -> CubeAPITrace:
         if self._trace is None:
             self._trace = CubeAPITrace(endpoint="/unknown", method="UNKNOWN")
@@ -104,7 +104,7 @@ class QueryGuard:
             trace.response_size_bytes = 0
         return trace
 
-    def extract_for_response(self) -> Dict[str, Any]:
+    def extract_for_response(self) -> dict[str, Any]:
         """Serialize the last trace for the HTTP response body (for transparency UI)."""
         if self._trace is None:
             return {}
@@ -114,5 +114,5 @@ class QueryGuard:
         }
 
     @staticmethod
-    def dict_from_trace(trace: CubeAPITrace) -> Dict[str, Any]:
+    def dict_from_trace(trace: CubeAPITrace) -> dict[str, Any]:
         return asdict(trace)

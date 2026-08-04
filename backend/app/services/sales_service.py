@@ -1,4 +1,3 @@
-from typing import List
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -11,7 +10,7 @@ class SalesService:
     def __init__(self, db: Session):
         self.db = db
 
-    def list_sales(self, limit: int = 100, offset: int = 0) -> tuple[List[SalesItem], int]:
+    def list_sales(self, limit: int = 100, offset: int = 0) -> tuple[list[SalesItem], int]:
         engine = get_engine()
         with engine.connect() as connection:
             row_count = connection.execute(text("SELECT COUNT(*) FROM fact_sales")).scalar_one()

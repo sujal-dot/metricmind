@@ -6,14 +6,18 @@ import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.explain.confidence_score import ConfidenceBreakdown
+    from app.explain.root_cause import RootCauseFinding
 
 from app.agents.cube_client import CubeClient
 from app.services.metrics_service import MetricsService
 
 logger = logging.getLogger("metricmind.explain.metric_analyzer")
 
-REGION_ALIASES: Dict[str, List[str]] = {
+REGION_ALIASES: dict[str, list[str]] = {
     "Europe": ["europe", "european", "eu"],
     "North America": ["north america", "na", "us", "usa", "canada", "united states"],
     "Asia Pacific": ["asia pacific", "apac", "asia", "japan", "china", "australia", "india"],
@@ -28,33 +32,33 @@ class MetricSnapshot:
     """A comparable snapshot of all relevant metrics for an explain query."""
 
     question: str
-    region: Optional[str] = None
-    period: Optional[str] = None
+    region: str | None = None
+    period: str | None = None
     primary_metric: str = "margin"
     direction_hint: str = "unknown"
 
-    current: Dict[str, float] = field(default_factory=dict)
-    prior: Dict[str, float] = field(default_factory=dict)
-    deltas_pct: Dict[str, float] = field(default_factory=dict)
-    deltas_abs: Dict[str, float] = field(default_factory=dict)
+    current: dict[str, float] = field(default_factory=dict)
+    prior: dict[str, float] = field(default_factory=dict)
+    deltas_pct: dict[str, float] = field(default_factory=dict)
+    deltas_abs: dict[str, float] = field(default_factory=dict)
 
-    cube_queries: List[Dict[str, Any]] = field(default_factory=list)
+    cube_queries: list[dict[str, Any]] = field(default_factory=list)
     source: str = "demo"
 
-    def get(self, key: str) -> Optional[float]:
+    def get(self, key: str) -> float | None:
         return self.current.get(key)
 
-    def pct_change(self, key: str) -> Optional[float]:
+    def pct_change(self, key: str) -> float | None:
         return self.deltas_pct.get(key)
 
-    def abs_change(self, key: str) -> Optional[float]:
+    def abs_change(self, key: str) -> float | None:
         return self.deltas_abs.get(key)
 
 
 class MetricAnalyzer:
     """Extract region/metric/period hints from question and build comparable snapshots."""
 
-    SERVICE_METRIC_MAP: Dict[str, str] = {
+    SERVICE_METRIC_MAP: dict[str, str] = {
         "total_revenue": "revenue",
         "total_profit": "profit",
         "profit_margin": "margin",
@@ -63,7 +67,7 @@ class MetricAnalyzer:
         "average_order_value": "aov",
     }
 
-    METRIC_HINTS: Tuple[Tuple[str, str], ...] = (
+    METRIC_HINTS: tuple[tuple[str, str], ...] = (
         ("shipping costs", "shipping_cost"),
         ("shipping cost", "shipping_cost"),
         ("logistics cost", "shipping_cost"),
@@ -86,7 +90,7 @@ class MetricAnalyzer:
         ("cost", "cost"),
     )
 
-    DIRECTION_HINTS: Tuple[Tuple[str, str], ...] = (
+    DIRECTION_HINTS: tuple[tuple[str, str], ...] = (
         ("decrease", "down"),
         ("decreased", "down"),
         ("drop", "down"),
@@ -114,7 +118,7 @@ class MetricAnalyzer:
         ("better", "up"),
     )
 
-    CUBE_MEASURE_MAP: Dict[str, str] = {
+    CUBE_MEASURE_MAP: dict[str, str] = {
         "FactSales.revenue": "revenue",
         "FactSales.profit": "profit",
         "FactSales.totalOrders": "orders",
@@ -125,10 +129,10 @@ class MetricAnalyzer:
         "FactSales.cost": "cost",
     }
 
-    def __init__(self, metrics_service: Optional[MetricsService] = None):
+    def __init__(self, metrics_service: MetricsService | None = None):
         self.metrics_service = metrics_service or MetricsService()
         try:
-            self.cube_client: Optional[CubeClient] = CubeClient()
+            self.cube_client: CubeClient | None = CubeClient()
         except Exception:
             self.cube_client = None
             logger.warning("CubeClient unavailable in MetricAnalyzer - will use fallbacks")
@@ -159,7 +163,7 @@ class MetricAnalyzer:
     # ------------------------------------------------------------------
     # Hint extraction
     # ------------------------------------------------------------------
-    def detect_region(self, question: str) -> Optional[str]:
+    def detect_region(self, question: str) -> str | None:
         q = question.lower()
         for region, aliases in REGION_ALIASES.items():
             if any(a in q for a in aliases):
@@ -180,7 +184,7 @@ class MetricAnalyzer:
                 return direction
         return "unknown"
 
-    def detect_period(self, question: str) -> Optional[str]:
+    def detect_period(self, question: str) -> str | None:
         q = question.lower()
         m = re.search(r"\b(20\d{2})\b", q)
         if m:
@@ -194,7 +198,7 @@ class MetricAnalyzer:
     # ------------------------------------------------------------------
     # Convenience API for QA/test pipelines
     # ------------------------------------------------------------------
-    def detect_hints(self, question: str) -> Dict[str, Any]:
+    def detect_hints(self, question: str) -> dict[str, Any]:
         """Aggregate all hint detectors into a single hints dict."""
         region = self.detect_region(question)
         primary_metric = self.detect_primary_metric(question)
@@ -210,18 +214,18 @@ class MetricAnalyzer:
 
     async def analyze(
         self,
-        hints: Optional[Dict[str, Any]] = None,
-        question: Optional[str] = None,
-    ) -> Tuple[MetricSnapshot, List["RootCauseFinding"], int, "ConfidenceBreakdown", List[str], Dict[str, Any]]:
+        hints: dict[str, Any] | None = None,
+        question: str | None = None,
+    ) -> tuple[MetricSnapshot, list["RootCauseFinding"], int, "ConfidenceBreakdown", list[str], dict[str, Any]]:
         """Full evidence-based analysis path: snapshot → findings → score → recs.
 
         Accepts either a pre-built hints dict (region/metric/period/direction) or a
         raw question. Returns the same tuple the ExplainAgent assembles internally,
         avoiding any LLM call. Used by QA and for quick CLI inspections.
         """
-        from app.explain.root_cause import RootCauseAnalyzer
-        from app.explain.recommendation_engine import RecommendationEngine
         from app.explain.confidence_score import ConfidenceScorer
+        from app.explain.recommendation_engine import RecommendationEngine
+        from app.explain.root_cause import RootCauseAnalyzer
 
         if hints is None:
             if question is None:
@@ -261,9 +265,9 @@ class MetricAnalyzer:
 
     def analyze_sync(
         self,
-        hints: Optional[Dict[str, Any]] = None,
-        question: Optional[str] = None,
-    ) -> Tuple[MetricSnapshot, List["RootCauseFinding"], int, "ConfidenceBreakdown", List[str], Dict[str, Any]]:
+        hints: dict[str, Any] | None = None,
+        question: str | None = None,
+    ) -> tuple[MetricSnapshot, list["RootCauseFinding"], int, "ConfidenceBreakdown", list[str], dict[str, Any]]:
         """Synchronous wrapper for analyze() — runs via asyncio.run()."""
         try:
             loop = asyncio.get_event_loop()
@@ -278,7 +282,7 @@ class MetricAnalyzer:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _default_date_ranges() -> Tuple[Tuple[date, date], Tuple[date, date]]:
+    def _default_date_ranges() -> tuple[tuple[date, date], tuple[date, date]]:
         """Return (current_date_range, prior_date_range) for Cube queries.
 
         Default window: current = last 90 days, prior = 90 days before that.
@@ -292,10 +296,10 @@ class MetricAnalyzer:
 
     def _build_cube_query(
         self,
-        region: Optional[str],
-        date_from: Optional[date] = None,
-        date_to: Optional[date] = None,
-    ) -> Dict[str, Any]:
+        region: str | None,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> dict[str, Any]:
         """Build a Cube.dev query dict for measures + region filter + time range."""
         measures = [
             "FactSales.revenue",
@@ -308,7 +312,7 @@ class MetricAnalyzer:
             "FactSales.cost",
         ]
 
-        filters: List[Dict[str, Any]] = []
+        filters: list[dict[str, Any]] = []
         if region:
             filters.append({
                 "member": "DimRegion.region",
@@ -316,7 +320,7 @@ class MetricAnalyzer:
                 "values": [region],
             })
 
-        time_dimensions: List[Dict[str, Any]] = []
+        time_dimensions: list[dict[str, Any]] = []
         if date_from and date_to:
             time_dimensions.append({
                 "dimension": "DimDate.fullDate",
@@ -330,7 +334,7 @@ class MetricAnalyzer:
         }
 
     @staticmethod
-    def _estimate_missing(metrics: Dict[str, float]) -> Dict[str, float]:
+    def _estimate_missing(metrics: dict[str, float]) -> dict[str, float]:
         """Cross-derive missing metrics from available ones. Never returns empty dict."""
         m = {k: v for k, v in metrics.items() if v is not None}
 
@@ -379,7 +383,7 @@ class MetricAnalyzer:
             aov = revenue / orders
             m["aov"] = aov
         if orders == 0 and aov > 0 and revenue > 0:
-            orders = int(round(revenue / aov))
+            orders = round(revenue / aov)
             m["orders"] = orders
 
         if discount_amount == 0 and revenue > 0:
@@ -393,7 +397,7 @@ class MetricAnalyzer:
 
         customers = int(m.get("customers") or 0)
         if customers == 0 and orders > 0:
-            customers = max(1, int(round(orders * 0.35)))
+            customers = max(1, round(orders * 0.35))
             m["customers"] = customers
 
         margin = float(m.get("margin") or 0.0)
@@ -436,8 +440,8 @@ class MetricAnalyzer:
 
     async def _run_cube_query(
         self,
-        query: Dict[str, Any],
-    ) -> Tuple[Dict[str, float], Optional[Dict[str, Any]]]:
+        query: dict[str, Any],
+    ) -> tuple[dict[str, float], dict[str, Any] | None]:
         """Run a Cube query and extract mapped metrics. Returns (metrics, trace_info_or_None)."""
         if self.cube_client is None:
             return {}, None
@@ -445,7 +449,7 @@ class MetricAnalyzer:
             response = await self.cube_client.load(query)
             data_rows = response.get("data") or [{}]
             row = data_rows[0] if data_rows else {}
-            extracted: Dict[str, float] = {}
+            extracted: dict[str, float] = {}
             for cube_key, internal_key in self.CUBE_MEASURE_MAP.items():
                 if cube_key in row and row[cube_key] is not None:
                     try:
@@ -454,10 +458,10 @@ class MetricAnalyzer:
                         continue
             internal_orders = extracted.get("orders", 0.0)
             if internal_orders > 0 and abs(internal_orders - int(internal_orders)) < 0.5:
-                extracted["orders"] = float(int(round(internal_orders)))
+                extracted["orders"] = float(round(internal_orders))
             internal_customers = extracted.get("customers", 0.0)
             if internal_customers > 0 and abs(internal_customers - int(internal_customers)) < 0.5:
-                extracted["customers"] = float(int(round(internal_customers)))
+                extracted["customers"] = float(round(internal_customers))
             trace_info = {
                 "query": query,
                 "response_sample_keys": list(row.keys()),
@@ -484,7 +488,7 @@ class MetricAnalyzer:
         current_raw, current_trace = await self._run_cube_query(current_query)
         prior_raw, prior_trace = await self._run_cube_query(prior_query)
 
-        cube_queries: List[Dict[str, Any]] = []
+        cube_queries: list[dict[str, Any]] = []
         if current_trace is not None:
             cube_queries.append({
                 "phase": "current",
@@ -556,7 +560,7 @@ class MetricAnalyzer:
                 if k in ("margin", "margin_ratio"):
                     prior[k] = v
                 elif k in ("orders", "customers"):
-                    prior[k] = max(1, int(round(v * rev_ratio)))
+                    prior[k] = max(1, round(v * rev_ratio))
                 else:
                     if k == "profit":
                         prior[k] = round(v * profit_ratio, 2)
@@ -564,8 +568,8 @@ class MetricAnalyzer:
                         prior[k] = round(v * rev_ratio, 2)
             logger.warning("MetricAnalyzer: prior period unavailable, using proportional estimate from current")
 
-        deltas_pct: Dict[str, float] = {}
-        deltas_abs: Dict[str, float] = {}
+        deltas_pct: dict[str, float] = {}
+        deltas_abs: dict[str, float] = {}
         for key in current:
             c = float(current[key])
             p = prior.get(key)

@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
@@ -31,12 +31,10 @@ async def get_metrics(
 
     prior_metrics = MetricsBase(**prior_raw) if prior_raw else None
 
-    period_change_pct: Dict[str, Any] = {}
+    period_change_pct: dict[str, Any] = {}
     if deltas_raw:
         for k, v in deltas_raw.items():
-            if v is None or (isinstance(v, float) and v != v):
-                period_change_pct[k] = None
-            elif isinstance(v, float) and (v == float("inf") or v == float("-inf")):
+            if v is None or (isinstance(v, float) and v != v) or isinstance(v, float) and (v == float("inf") or v == float("-inf")):
                 period_change_pct[k] = None
             else:
                 period_change_pct[k] = round(float(v), 2)

@@ -3,9 +3,8 @@ from datetime import datetime
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from pydantic import BaseModel, EmailStr, Field
 
-from app.auth.dependencies import get_current_user
+from app.auth.dependencies import get_auth_service, get_current_user
 from app.auth.service import AuthService
-from app.auth.dependencies import get_auth_service
 from app.config.settings import settings
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -40,7 +39,7 @@ def _set_auth_cookies(
     csrf_token: str,
     expires_at: datetime,
 ) -> None:
-    max_age = max(0, int((expires_at.timestamp() - datetime.now(expires_at.tzinfo).timestamp())))
+    max_age = max(0, int(expires_at.timestamp() - datetime.now(expires_at.tzinfo).timestamp()))
     cookie_kwargs = {
         "secure": settings.effective_session_cookie_secure,
         "samesite": settings.session_cookie_samesite,

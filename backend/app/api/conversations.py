@@ -1,10 +1,10 @@
 import json
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
@@ -18,17 +18,17 @@ router = APIRouter(prefix="/api/v1/conversations", tags=["conversations"])
 
 
 class CreateConversationRequest(BaseModel):
-    title: Optional[str] = Field(default=None, max_length=512)
+    title: str | None = Field(default=None, max_length=512)
 
 
 class UpdateConversationRequest(BaseModel):
-    title: Optional[str] = Field(default=None, max_length=512)
+    title: str | None = Field(default=None, max_length=512)
 
 
 class AppendMessageRequest(BaseModel):
     role: str = Field(..., pattern="^(user|assistant)$")
     content: str = Field(..., min_length=1, max_length=20000)
-    metadata: Optional[dict] = None
+    metadata: dict | None = None
 
 
 def _row_to_dict(row: Any) -> dict:
@@ -118,7 +118,7 @@ async def create_conversation(
         raise HTTPException(status_code=500, detail="Database error") from exc
 
 
-def _get_conversation_owner(conn: Any, conversation_id: str) -> Optional[int]:
+def _get_conversation_owner(conn: Any, conversation_id: str) -> int | None:
     sql = text("SELECT user_id FROM conversations WHERE id = CAST(:id AS uuid)")
     row = conn.execute(sql, {"id": conversation_id}).fetchone()
     return row.user_id if row else None

@@ -7,10 +7,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Tuple
 
 # Phrases that ask for the entire dataset -------------------------------------
-DATA_DUMP_PHRASES: Tuple[str, ...] = (
+DATA_DUMP_PHRASES: tuple[str, ...] = (
     "every order ever",
     "all orders ever",
     "all transactions ever",
@@ -55,7 +54,7 @@ LARGE_COUNT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-SIZE_UNIT_PHRASES: Tuple[str, ...] = (
+SIZE_UNIT_PHRASES: tuple[str, ...] = (
     "million rows",
     "millions of rows",
     "millions of records",
@@ -66,7 +65,7 @@ SIZE_UNIT_PHRASES: Tuple[str, ...] = (
 )
 
 # Filter indicators — if a question contains these, we consider it narrowed -----
-NARROWING_INDICATORS: Tuple[str, ...] = (
+NARROWING_INDICATORS: tuple[str, ...] = (
     "last month",
     "this month",
     "last week",
@@ -129,8 +128,8 @@ NARROWING_INDICATORS: Tuple[str, ...] = (
 class ExpensiveQueryResult:
     question: str
     is_expensive: bool
-    suggested_filters: List[str] = field(default_factory=list)
-    matched_reasons: List[str] = field(default_factory=list)
+    suggested_filters: list[str] = field(default_factory=list)
+    matched_reasons: list[str] = field(default_factory=list)
     has_narrowing: bool = False
     severity: str = "none"  # "low" | "medium" | "high" | "none"
 
@@ -190,7 +189,7 @@ class ExpensiveQueryDetector:
         )
 
     @staticmethod
-    def _suggest(lowered: str) -> List[str]:
+    def _suggest(lowered: str) -> list[str]:
         suggestions: list[str] = []
         if not any(t in lowered for t in ("month", "year", "quarter", "week", "day")):
             suggestions.append("Add a time filter such as 'last month' or '2025'")

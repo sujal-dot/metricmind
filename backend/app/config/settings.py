@@ -1,6 +1,5 @@
-import secrets
 from pathlib import Path
-from typing import List, Literal
+from typing import Literal
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -55,7 +54,7 @@ class Settings(BaseSettings):
     csrf_cookie_name: str = "metricmind_csrf"
     csrf_header_name: str = "X-CSRF-Token"
 
-    allowed_origins: List[str] = [
+    allowed_origins: list[str] = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:8000",

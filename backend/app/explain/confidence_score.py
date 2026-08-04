@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import List
 
 from app.explain.metric_analyzer import MetricSnapshot
 from app.explain.root_cause import RootCauseFinding
@@ -48,7 +47,7 @@ class ConfidenceScorer:
     def score(
         self,
         snapshot: MetricSnapshot,
-        findings: List[RootCauseFinding],
+        findings: list[RootCauseFinding],
     ) -> ConfidenceBreakdown:
         data_completeness = self._data_completeness(snapshot)
         delta_availability = self._delta_availability(snapshot)
@@ -60,7 +59,7 @@ class ConfidenceScorer:
             + evidence_strength * 0.30
             + trend_consistency * 0.15
         )
-        total = int(round(max(20.0, min(100.0, total_raw))))
+        total = round(max(20.0, min(100.0, total_raw)))
         breakdown = ConfidenceBreakdown(
             data_completeness=round(data_completeness, 2),
             delta_availability=round(delta_availability, 2),
@@ -85,7 +84,7 @@ class ConfidenceScorer:
         present = sum(1 for k in EXPECTED_KEYS if deltas.get(k) is not None)
         return (present / len(EXPECTED_KEYS)) * 100
 
-    def _evidence_strength(self, findings: List[RootCauseFinding]) -> float:
+    def _evidence_strength(self, findings: list[RootCauseFinding]) -> float:
         if not findings:
             return 25.0
         top = findings[0].weight if findings else 0.0
@@ -98,7 +97,7 @@ class ConfidenceScorer:
     def _trend_consistency(
         self,
         snapshot: MetricSnapshot,
-        findings: List[RootCauseFinding],
+        findings: list[RootCauseFinding],
     ) -> float:
         direction = snapshot.direction_hint or "unknown"
         primary = snapshot.primary_metric or "margin"

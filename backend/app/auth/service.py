@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.engine import Engine
 
-from app.auth.passwords import verify_password, hash_password
+from app.auth.passwords import hash_password, verify_password
 from app.config.settings import settings
 
 

@@ -2,9 +2,9 @@ import logging
 from typing import Literal
 
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config.settings import settings
 
@@ -24,8 +24,8 @@ class LLMFactory:
 
     @staticmethod
     def create_llm(
-        provider: Literal["groq", "openai", "gemini"] = None,
-        model: str = None,
+        provider: Literal["groq", "openai", "gemini"] | None = None,
+        model: str | None = None,
         temperature: float = 0.1,
     ) -> BaseChatModel:
         provider = provider or settings.llm_provider

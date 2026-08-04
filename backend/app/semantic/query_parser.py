@@ -1,7 +1,7 @@
 """Convert logical user intent into valid Cube.dev API queries."""
 import logging
 from datetime import date, timedelta
-from typing import Any, Dict, List
+from typing import Any
 
 from app.semantic.intent_detector import UserIntent
 
@@ -36,12 +36,12 @@ class QueryParser:
 
     TIME_DIMENSION = "DimDate.fullDate"
 
-    def parse(self, intent: UserIntent) -> Dict[str, Any]:
+    def parse(self, intent: UserIntent) -> dict[str, Any]:
         logger.info("Parsing semantic intent into Cube query: %s", intent.model_dump())
 
         measures = [self._metric_member(metric) for metric in intent.metrics]
         dimensions = self._dimension_members(intent.dimensions, intent=intent)
-        cube_query: Dict[str, Any] = {"measures": measures}
+        cube_query: dict[str, Any] = {"measures": measures}
         if dimensions:
             cube_query["dimensions"] = dimensions
 
@@ -62,8 +62,8 @@ class QueryParser:
     def _metric_member(self, metric: str) -> str:
         return self.METRIC_TO_MEMBER.get(metric, "FactSales.revenue")
 
-    def _dimension_members(self, dimensions: List[str], intent: UserIntent | None = None) -> List[str]:
-        members: List[str] = []
+    def _dimension_members(self, dimensions: list[str], intent: UserIntent | None = None) -> list[str]:
+        members: list[str] = []
         is_customer_count = intent and "customers" in intent.metrics and not intent.limit
         for dimension in dimensions:
             if is_customer_count and dimension == "customer":
@@ -73,12 +73,12 @@ class QueryParser:
                 members.append(member)
         return members
 
-    def _order_field(self, intent: UserIntent, measures: List[str], dimensions: List[str]) -> str:
+    def _order_field(self, intent: UserIntent, measures: list[str], dimensions: list[str]) -> str:
         if dimensions and intent.limit:
             return measures[0]
         return measures[0]
 
-    def _build_time_dimension(self, intent: UserIntent) -> Dict[str, Any] | None:
+    def _build_time_dimension(self, intent: UserIntent) -> dict[str, Any] | None:
         if intent.comparison == "month_over_month":
             start, end = self._current_and_previous_month_range()
             return {
@@ -90,7 +90,7 @@ class QueryParser:
         if not intent.time_period and not intent.granularity:
             return None
 
-        time_dimension: Dict[str, Any] = {"dimension": self.TIME_DIMENSION}
+        time_dimension: dict[str, Any] = {"dimension": self.TIME_DIMENSION}
         if intent.time_period:
             if "range" in intent.time_period:
                 time_dimension["dateRange"] = intent.time_period["range"]

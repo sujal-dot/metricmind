@@ -6,7 +6,7 @@ import logging
 import time
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from app.agents.cube_client import CubeClient
 from app.agents.llm_factory import LLMFactory
@@ -36,7 +36,7 @@ class ExplainAgent:
 
     def __init__(
         self,
-        llm_provider: Optional[Literal["groq", "openai", "gemini"]] = None,
+        llm_provider: Literal["groq", "openai", "gemini"] | None = None,
         use_llm_synthesis: bool = False,
     ) -> None:
         self.provider = llm_provider or settings.llm_provider
@@ -46,7 +46,7 @@ class ExplainAgent:
         self.recommendations = RecommendationEngine()
         self.confidence = ConfidenceScorer()
         try:
-            self.cube_client: Optional[CubeClient] = CubeClient()
+            self.cube_client: CubeClient | None = CubeClient()
         except Exception:
             self.cube_client = None
             logger.warning("CubeClient unavailable - will use analyzer fallbacks")
@@ -82,11 +82,11 @@ class ExplainAgent:
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
-    async def explain(self, question: str) -> Dict[str, Any]:
+    async def explain(self, question: str) -> dict[str, Any]:
         start = time.perf_counter()
         question = (question or "").strip()
 
-        log_event: Dict[str, Any] = {
+        log_event: dict[str, Any] = {
             "question": question,
             "cube_queries": [],
             "metrics_analyzed": [],
@@ -160,10 +160,10 @@ class ExplainAgent:
         self,
         question: str,
         snapshot: MetricSnapshot,
-        findings: List[RootCauseFinding],
-        recommendations: List[str],
+        findings: list[RootCauseFinding],
+        recommendations: list[str],
         breakdown: ConfidenceBreakdown,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         current = snapshot.current or {}
         summary = {
             "region": snapshot.region or "Global",
@@ -201,10 +201,10 @@ class ExplainAgent:
         self,
         question: str,
         snapshot: MetricSnapshot,
-        findings: List[RootCauseFinding],
-        recommendations: List[str],
+        findings: list[RootCauseFinding],
+        recommendations: list[str],
         breakdown: ConfidenceBreakdown,
-    ) -> Optional[str]:
+    ) -> str | None:
         if self._llm is None:
             self._llm = LLMFactory.create_llm(provider=self.provider, temperature=0.1)
 
@@ -244,7 +244,7 @@ class ExplainAgent:
     # ------------------------------------------------------------------
     # Logging
     # ------------------------------------------------------------------
-    def _write_log(self, event: Dict[str, Any], success: bool) -> None:
+    def _write_log(self, event: dict[str, Any], success: bool) -> None:
         try:
             log_path = Path(__file__).resolve().parents[2] / "logs"
             log_path.mkdir(parents=True, exist_ok=True)

@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -20,7 +20,7 @@ router = APIRouter(tags=["Explain"])
 _POLICY = PolicyEngine()
 
 
-def _attach_transparency(payload: Dict[str, Any], question: str) -> None:
+def _attach_transparency(payload: dict[str, Any], question: str) -> None:
     cube_response = payload.get("cube_json") or {"summary": payload.get("summary", {})}
     trace = {
         "endpoint": "/cubejs-api/v1/load",
@@ -94,7 +94,7 @@ async def explain_question(
         )
 
     try:
-        payload: Dict[str, Any] = await agent.explain(question)
+        payload: dict[str, Any] = await agent.explain(question)
     except ValueError as exc:
         logger.warning("Explain engine rejected question: %s -> %s", question, exc)
         _POLICY.logger.write_error(

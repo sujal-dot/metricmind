@@ -7,8 +7,9 @@ logger = logging.getLogger("metricmind.migrations")
 
 def run_migrations_upgrade(revision: str = "head") -> bool:
     try:
-        from alembic import command
         from alembic.config import Config
+
+        from alembic import command
     except ImportError:
         logger.exception("alembic is not installed; cannot run migrations")
         return False

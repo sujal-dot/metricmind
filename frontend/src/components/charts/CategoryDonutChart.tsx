@@ -32,15 +32,15 @@ export default function CategoryDonutChart({
     return {
       tooltip: {
         trigger: 'item',
-        formatter: (params: any) => {
+        formatter: (params: Record<string, unknown>) => {
           const valFormatted = new Intl.NumberFormat('en-US', {
             style: 'currency',
             currency: 'USD',
             maximumFractionDigits: 0,
-          }).format(params.value);
+          }).format(Number(params.value || 0));
           return `<div class="font-sans text-xs">
-            <span class="font-semibold">${params.name}</span><br/>
-            ${valFormatted} (${params.percent}%)
+            <span class="font-semibold">${String(params.name || '')}</span><br/>
+            ${valFormatted} (${String(params.percent || 0)}%)
           </div>`;
         },
       },

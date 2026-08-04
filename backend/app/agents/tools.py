@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from langchain_core.tools import BaseTool, StructuredTool
 from pydantic import BaseModel, Field
@@ -11,16 +11,16 @@ logger = logging.getLogger("metricmind.agents.tools")
 
 
 class CubeQueryInput(BaseModel):
-    query: Dict[str, Any] | None = Field(
+    query: dict[str, Any] | None = Field(
         None,
         description="Optional wrapped Cube.dev query JSON object.",
     )
     measures: list[str] | None = Field(None, description="Cube measure names to query.")
     dimensions: list[str] | None = Field(None, description="Cube dimension names to group by.")
-    timeDimensions: list[Dict[str, Any]] | None = Field(None, description="Cube time dimension filters.")
-    filters: list[Dict[str, Any]] | None = Field(None, description="Cube filters.")
+    timeDimensions: list[dict[str, Any]] | None = Field(None, description="Cube time dimension filters.")
+    filters: list[dict[str, Any]] | None = Field(None, description="Cube filters.")
     limit: int | None = Field(None, description="Maximum number of rows to return.")
-    order: Dict[str, Any] | None = Field(None, description="Cube order clause.")
+    order: dict[str, Any] | None = Field(None, description="Cube order clause.")
 
     class Config:
         extra = "allow"
@@ -36,7 +36,7 @@ class CubeQueryTool:
     def __init__(self, client: CubeClient | None = None):
         self.client = client or CubeClient()
 
-    async def arun(self, query: Dict[str, Any]) -> str:
+    async def arun(self, query: dict[str, Any]) -> str:
         try:
             result = await self.client.load(query)
             return json.dumps(result, indent=2)

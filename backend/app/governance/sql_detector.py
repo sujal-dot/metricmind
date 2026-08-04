@@ -7,10 +7,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Tuple
 
 # ---- Token / keyword heuristics -------------------------------------------------
-DANGEROUS_DML_DDL: Tuple[str, ...] = (
+DANGEROUS_DML_DDL: tuple[str, ...] = (
     "drop table",
     "alter table",
     "create table",
@@ -38,7 +37,7 @@ DANGEROUS_DML_DDL: Tuple[str, ...] = (
 )
 
 # SQL keywords that by themselves indicate the user is asking for raw SQL
-SQL_REQUEST_KEYWORDS: Tuple[str, ...] = (
+SQL_REQUEST_KEYWORDS: tuple[str, ...] = (
     "write sql",
     "generate sql",
     "give me sql",
@@ -58,7 +57,7 @@ SQL_REQUEST_KEYWORDS: Tuple[str, ...] = (
 )
 
 # Regex patterns that match injections -------------------------------------------
-_INJECTION_PATTERNS: Tuple[Tuple[str, str], ...] = (
+_INJECTION_PATTERNS: tuple[tuple[str, str], ...] = (
     # OR 1=1 / AND 1=1 style tautologies (allow whitespace variations)
     (r"\b(or|and)\s+['\"]?\d+['\"]?\s*=\s*['\"]?\d+['\"]?", "tautology"),
     # Comment sequences: -- or /* ... */
@@ -82,8 +81,8 @@ class SQLDetectionResult:
     question: str
     is_sql_injection: bool
     is_sql_request: bool
-    matched_injection_reasons: List[str] = field(default_factory=list)
-    matched_request_reasons: List[str] = field(default_factory=list)
+    matched_injection_reasons: list[str] = field(default_factory=list)
+    matched_request_reasons: list[str] = field(default_factory=list)
     confidence: float = 0.0
 
     @property
@@ -145,8 +144,8 @@ class SQLDetector:
     def _confidence(
         is_inj: bool,
         is_req: bool,
-        reasons_inj: List[str],
-        reasons_req: List[str],
+        reasons_inj: list[str],
+        reasons_req: list[str],
     ) -> float:
         score = 0.0
         if is_inj:

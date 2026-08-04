@@ -2,28 +2,28 @@ import logging
 import time
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, Request, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
+from app.agents.bi_agent import BIAgent
+from app.api.analytics import router as analytics_router
 from app.api.auth import router as auth_router
+from app.api.conversations import router as conversations_router
+from app.api.explain import router as explain_router
+from app.api.governance import router as governance_router
 from app.api.health import router as health_router
 from app.api.metrics import router as metrics_router
 from app.api.routes import router as routes_router
 from app.api.sales import router as sales_router
-from app.api.analytics import router as analytics_router
 from app.api.semantic import router as semantic_router
-from app.api.explain import router as explain_router
-from app.api.governance import router as governance_router
-from app.api.conversations import router as conversations_router
 from app.api.users import router as users_router
 from app.auth.dependencies import get_current_user, require_csrf
-from app.agents.bi_agent import BIAgent
 from app.config.settings import settings
 from app.governance.policy_engine import PolicyEngine
-from app.models.schemas import BIQuestionRequest, BIAnswerResponse
+from app.models.schemas import BIAnswerResponse, BIQuestionRequest
 from app.services.database import check_database_connection
 
 BASE_DIR = Path(__file__).resolve().parents[2]

@@ -12,6 +12,7 @@ import app.services.sales_service as sales_service_module
 import app.services.metrics_service as metrics_service_module
 from app.main import app
 from app.auth.dependencies import get_current_user, require_csrf
+from app.services.database import get_db
 from app.agents.bi_agent import BIAgent
 from app.agents.llm_factory import LLMFactory
 from app.agents.prompts import BI_ANALYST_SYSTEM_PROMPT
@@ -23,6 +24,7 @@ app.dependency_overrides[get_current_user] = lambda: {
     "is_active": True,
 }
 app.dependency_overrides[require_csrf] = lambda: None
+app.dependency_overrides[get_db] = lambda: None
 
 client = TestClient(app)
 
@@ -35,11 +37,15 @@ def test_root_endpoint():
     assert payload["message"] == "MetricMind Backend Running"
 
 
+import app.api.sales as sales_api_module
+
+
 def test_sales_endpoint():
     original_service = sales_service_module.SalesService
+    original_api_service = sales_api_module.SalesService
 
     class FakeSalesService:
-        def __init__(self, _db):
+        def __init__(self, _db=None):
             pass
 
         def list_sales(self, limit: int = 100, offset: int = 0):
@@ -57,10 +63,12 @@ def test_sales_endpoint():
             )
 
     sales_service_module.SalesService = FakeSalesService
+    sales_api_module.SalesService = FakeSalesService
     try:
         response = client.get("/api/v1/sales", params={"limit": 5, "offset": 0})
     finally:
         sales_service_module.SalesService = original_service
+        sales_api_module.SalesService = original_api_service
 
     assert response.status_code == 200
     payload = response.json()

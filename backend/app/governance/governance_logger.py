@@ -5,7 +5,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger("metricmind.governance.logger")
 
@@ -15,7 +15,7 @@ class GovernanceLogger:
 
     FILENAME = "governance_events.jsonl"
 
-    def __init__(self, log_dir: Optional[Path] = None) -> None:
+    def __init__(self, log_dir: Path | None = None) -> None:
         self.log_dir = log_dir or (Path(__file__).resolve().parents[2] / "logs")
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.path = self.log_dir / self.FILENAME
@@ -27,10 +27,10 @@ class GovernanceLogger:
         self,
         result: Any,
         *,
-        route: Optional[str] = None,
+        route: str | None = None,
         validation_duration_ms: float = 0.0,
     ) -> bool:
-        event: Dict[str, Any] = {
+        event: dict[str, Any] = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
             "event": "policy_decision",
             "route": route,
@@ -54,8 +54,8 @@ class GovernanceLogger:
         self,
         *,
         question: str,
-        route: Optional[str],
-        cube_trace: Dict[str, Any],
+        route: str | None,
+        cube_trace: dict[str, Any],
     ) -> bool:
         event = {
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
@@ -73,7 +73,7 @@ class GovernanceLogger:
         self,
         *,
         question: str,
-        route: Optional[str],
+        route: str | None,
         error_type: str,
         detail: str,
     ) -> bool:
@@ -90,7 +90,7 @@ class GovernanceLogger:
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
-    def _append(self, event: Dict[str, Any]) -> bool:
+    def _append(self, event: dict[str, Any]) -> bool:
         try:
             with self.path.open("a", encoding="utf-8") as fh:
                 fh.write(json.dumps(event, default=str, ensure_ascii=False) + "\n")

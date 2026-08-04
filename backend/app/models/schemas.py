@@ -1,4 +1,4 @@
-from typing import Generic, List, TypeVar, Any, Dict, Optional
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +19,7 @@ class SalesItem(BaseModel):
 
 
 class SalesListResponse(BaseModel):
-    items: List[SalesItem]
+    items: list[SalesItem]
     total: int
     limit: int
     offset: int
@@ -35,8 +35,8 @@ class MetricsBase(BaseModel):
 
 
 class MetricsResponse(MetricsBase):
-    prior_metrics: Optional[MetricsBase] = None
-    period_change_pct: Dict[str, Optional[float]] = Field(default_factory=dict)
+    prior_metrics: MetricsBase | None = None
+    period_change_pct: dict[str, float | None] = Field(default_factory=dict)
 
 
 class MonthlyAnalyticsPoint(BaseModel):
@@ -52,11 +52,11 @@ class AnalyticsDataPoint(BaseModel):
 
 
 class AnalyticsChartsResponse(BaseModel):
-    monthly: List[MonthlyAnalyticsPoint]
-    by_category: List[AnalyticsDataPoint]
-    by_region: List[AnalyticsDataPoint]
-    top_products: List[AnalyticsDataPoint]
-    top_customers: List[AnalyticsDataPoint]
+    monthly: list[MonthlyAnalyticsPoint]
+    by_category: list[AnalyticsDataPoint]
+    by_region: list[AnalyticsDataPoint]
+    top_products: list[AnalyticsDataPoint]
+    top_customers: list[AnalyticsDataPoint]
 
 
 class ErrorResponse(BaseModel):
@@ -64,7 +64,7 @@ class ErrorResponse(BaseModel):
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
-    items: List[T]
+    items: list[T]
     total: int
     limit: int
     offset: int
@@ -84,11 +84,11 @@ class BIAnswerResponse(BaseModel):
     answer: str
     source: str
     provider: str
-    cube_trace: Optional[Dict[str, Any]] = Field(
+    cube_trace: dict[str, Any] | None = Field(
         None,
         description="Transparency payload rendered by the frontend View API button.",
     )
-    cube_json: Optional[Dict[str, Any]] = Field(
+    cube_json: dict[str, Any] | None = Field(
         None,
         description="Cube.dev JSON response rendered by the frontend View JSON button.",
     )
@@ -104,27 +104,27 @@ class SemanticSearchRequest(BaseModel):
 
 
 class SemanticSearchIntent(BaseModel):
-    metrics: List[str] = Field(default_factory=list)
-    dimensions: List[str] = Field(default_factory=list)
-    time_period: Optional[Dict[str, Any]] = None
-    filters: Dict[str, Any] = Field(default_factory=dict)
-    ordering: Optional[Dict[str, str]] = None
-    limit: Optional[int] = None
-    granularity: Optional[str] = None
-    comparison: Optional[str] = None
+    metrics: list[str] = Field(default_factory=list)
+    dimensions: list[str] = Field(default_factory=list)
+    time_period: dict[str, Any] | None = None
+    filters: dict[str, Any] = Field(default_factory=dict)
+    ordering: dict[str, str] | None = None
+    limit: int | None = None
+    granularity: str | None = None
+    comparison: str | None = None
 
 
 class SemanticSearchResponse(BaseModel):
     question: str
     intent: SemanticSearchIntent
-    cube_response: Dict[str, Any]
+    cube_response: dict[str, Any]
     explanation: str
     provider: str
-    cube_trace: Optional[Dict[str, Any]] = Field(
+    cube_trace: dict[str, Any] | None = Field(
         None,
         description="Transparency payload rendered by the frontend View API button.",
     )
-    cube_json: Optional[Dict[str, Any]] = Field(
+    cube_json: dict[str, Any] | None = Field(
         None,
         description="Cube.dev JSON response rendered by the frontend View JSON button.",
     )
@@ -132,7 +132,7 @@ class SemanticSearchResponse(BaseModel):
 
 class ExplainSummary(BaseModel):
     region: str = Field(..., json_schema_extra={"example": "Europe"})
-    period: Optional[str] = Field(None, json_schema_extra={"example": "last month"})
+    period: str | None = Field(None, json_schema_extra={"example": "last month"})
     revenue: float = Field(..., json_schema_extra={"example": 1420000})
     cost: float = Field(..., json_schema_extra={"example": 1180000})
     shipping_cost: float = Field(..., json_schema_extra={"example": 165000})
@@ -144,8 +144,8 @@ class ExplainSummary(BaseModel):
     aov: float = Field(..., json_schema_extra={"example": 500})
     primary_metric: str = Field(..., json_schema_extra={"example": "margin"})
     direction_hint: str = Field(..., json_schema_extra={"example": "down"})
-    period_deltas_pct: Dict[str, Any] = Field(default_factory=dict)
-    period_deltas_abs: Dict[str, Any] = Field(default_factory=dict)
+    period_deltas_pct: dict[str, Any] = Field(default_factory=dict)
+    period_deltas_abs: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExplainRequest(BaseModel):
@@ -160,7 +160,7 @@ class ExplainRequest(BaseModel):
 class ExplainResponse(BaseModel):
     question: str
     summary: ExplainSummary
-    possible_reasons: List[str] = Field(
+    possible_reasons: list[str] = Field(
         default_factory=list,
         json_schema_extra={
             "example": [
@@ -171,8 +171,8 @@ class ExplainResponse(BaseModel):
         },
     )
     confidence: int = Field(..., json_schema_extra={"example": 92})
-    confidence_breakdown: Dict[str, Any] = Field(default_factory=dict)
-    recommendations: List[str] = Field(
+    confidence_breakdown: dict[str, Any] = Field(default_factory=dict)
+    recommendations: list[str] = Field(
         default_factory=list,
         json_schema_extra={
             "example": [
@@ -184,12 +184,12 @@ class ExplainResponse(BaseModel):
     )
     provider: str = Field(..., json_schema_extra={"example": "Groq"})
     data_source: str = Field("demo", json_schema_extra={"example": "cube_api"})
-    narrative: Optional[str] = Field(None, json_schema_extra={"example": "Optional LLM synthesis text"})
-    cube_trace: Optional[Dict[str, Any]] = Field(
+    narrative: str | None = Field(None, json_schema_extra={"example": "Optional LLM synthesis text"})
+    cube_trace: dict[str, Any] | None = Field(
         None,
         description="Transparency payload rendered by the frontend View API button.",
     )
-    cube_json: Optional[Dict[str, Any]] = Field(
+    cube_json: dict[str, Any] | None = Field(
         None,
         description="Cube.dev JSON response rendered by the frontend View JSON button.",
     )
@@ -205,7 +205,7 @@ class GovernanceValidationRequest(BaseModel):
         max_length=4000,
         json_schema_extra={"example": "SELECT * FROM Orders"},
     )
-    route: Optional[str] = Field(
+    route: str | None = Field(
         None,
         max_length=255,
         json_schema_extra={"example": "/ask"},
@@ -215,20 +215,20 @@ class GovernanceValidationRequest(BaseModel):
 
 class SecurityDecisionSchema(BaseModel):
     allowed: bool
-    block_reason: Optional[str] = None
-    block_code: Optional[str] = None
-    suggested_filters: List[str] = Field(default_factory=list)
+    block_reason: str | None = None
+    block_code: str | None = None
+    suggested_filters: list[str] = Field(default_factory=list)
     has_sql_injection: bool = False
     has_sql_request: bool = False
     is_expensive: bool = False
-    matched_reasons: List[str] = Field(default_factory=list)
+    matched_reasons: list[str] = Field(default_factory=list)
 
 
 class GovernanceValidationResponse(BaseModel):
     question: str
     decision: SecurityDecisionSchema
-    cube_trace: Optional[Dict[str, Any]] = None
-    cube_json: Optional[Dict[str, Any]] = None
+    cube_trace: dict[str, Any] | None = None
+    cube_json: dict[str, Any] | None = None
 
 
 class CubeTraceSchema(BaseModel):
@@ -239,8 +239,8 @@ class CubeTraceSchema(BaseModel):
 
     endpoint: str = Field(..., json_schema_extra={"example": "/cubejs-api/v1/load"})
     method: str = Field(..., json_schema_extra={"example": "POST"})
-    request_payload: Dict[str, Any] = Field(default_factory=dict)
-    query_parameters: Dict[str, Any] = Field(default_factory=dict)
+    request_payload: dict[str, Any] = Field(default_factory=dict)
+    query_parameters: dict[str, Any] = Field(default_factory=dict)
     execution_time_ms: float = Field(..., json_schema_extra={"example": 245.18})
     response_status: int = Field(..., json_schema_extra={"example": 200})
     response_size_bytes: int = Field(..., json_schema_extra={"example": 3892})

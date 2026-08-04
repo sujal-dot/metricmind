@@ -7,7 +7,7 @@ POST /governance/validate - runs PolicyEngine on one question (used by the
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends
 
@@ -95,8 +95,8 @@ async def governance_validate(
     result = _POLICY.validate(question, route=request.route)
     decision_schema = _decision_to_schema(question, result)
 
-    trace: Dict[str, Any] | None = None
-    json_body: Dict[str, Any] | None = None
+    trace: dict[str, Any] | None = None
+    json_body: dict[str, Any] | None = None
     if getattr(result, "cube_trace", None):
         trace = result.cube_trace
     if getattr(result, "cube_json", None):

@@ -1,12 +1,13 @@
 import logging
 import time
-from typing import Any, Dict, Literal, Sequence
+from collections.abc import Sequence
+from typing import Any, Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langchain_core.tools import BaseTool
 
-from app.agents.prompts import BI_ANALYST_SYSTEM_PROMPT, FINAL_ANSWER_INSTRUCTION
 from app.agents.llm_factory import LLMFactory
+from app.agents.prompts import BI_ANALYST_SYSTEM_PROMPT, FINAL_ANSWER_INSTRUCTION
 from app.agents.tools import get_all_tools
 from app.config.settings import settings
 
@@ -16,7 +17,7 @@ logger = logging.getLogger("metricmind.agents.bi_agent")
 class BIAgent:
     def __init__(
         self,
-        llm_provider: Literal["groq", "openai", "gemini"] = None,
+        llm_provider: Literal["groq", "openai", "gemini"] | None = None,
         llm: Any = None,
         tools: Sequence[BaseTool] | None = None,
     ):
@@ -27,7 +28,7 @@ class BIAgent:
         self.llm_with_tools = self.llm.bind_tools(self.tools)
         logger.info("BI Agent initialized successfully")
 
-    async def ask(self, question: str) -> Dict[str, Any]:
+    async def ask(self, question: str) -> dict[str, Any]:
         start_time = time.perf_counter()
         question = question.strip()
         if not question:

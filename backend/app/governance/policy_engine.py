@@ -9,10 +9,9 @@ based on the returned PolicyResult. This central module composes:
 """
 from __future__ import annotations
 
-import json
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from app.governance.governance_logger import GovernanceLogger
 from app.governance.query_guard import CubeAPITrace, QueryGuard
@@ -23,21 +22,21 @@ from app.governance.security_validator import SecurityDecision, SecurityValidato
 class PolicyViolation:
     code: str  # sql_injection | sql_request | expensive | unsupported
     message: str
-    reasons: List[str] = field(default_factory=list)
-    suggested_filters: List[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
+    suggested_filters: list[str] = field(default_factory=list)
 
 
 @dataclass
 class PolicyResult:
     question: str
     allowed: bool
-    decision: Optional[SecurityDecision] = None
-    violation: Optional[PolicyViolation] = None
-    cube_trace: Optional[Dict[str, Any]] = None
-    cube_json: Optional[Dict[str, Any]] = None
+    decision: SecurityDecision | None = None
+    violation: PolicyViolation | None = None
+    cube_trace: dict[str, Any] | None = None
+    cube_json: dict[str, Any] | None = None
     logged: bool = False
 
-    def as_http_error(self) -> Dict[str, Any]:
+    def as_http_error(self) -> dict[str, Any]:
         if self.allowed or not self.violation:
             return {}
         return {
@@ -69,7 +68,7 @@ class PolicyEngine:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def validate(self, question: str, *, route: Optional[str] = None) -> PolicyResult:
+    def validate(self, question: str, *, route: str | None = None) -> PolicyResult:
         question = (question or "").strip()
         started_at = time.perf_counter()
         decision = self.security_validator.validate(question)
@@ -114,13 +113,13 @@ class PolicyEngine:
     def attach_cube_trace(
         self,
         result: PolicyResult,
-        cube_json: Optional[Dict[str, Any]],
+        cube_json: dict[str, Any] | None,
         *,
         endpoint: str = "/cubejs-api/v1/load",
         method: str = "POST",
-        query_parameters: Optional[Dict[str, Any]] = None,
-        request_payload: Optional[Dict[str, Any]] = None,
-        started_at: Optional[float] = None,
+        query_parameters: dict[str, Any] | None = None,
+        request_payload: dict[str, Any] | None = None,
+        started_at: float | None = None,
         status: int = 200,
     ) -> CubeAPITrace:
         self.query_guard.begin_trace(

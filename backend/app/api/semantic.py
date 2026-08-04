@@ -5,12 +5,9 @@ import time
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth.dependencies import get_current_user, require_csrf
-from app.models.schemas import (
-    SemanticSearchRequest,
-    SemanticSearchResponse
-)
-from app.semantic.semantic_router import SemanticRouter
 from app.governance.policy_engine import PolicyEngine
+from app.models.schemas import SemanticSearchRequest, SemanticSearchResponse
+from app.semantic.semantic_router import SemanticRouter
 
 logger = logging.getLogger("metricmind.api.semantic")
 router = APIRouter()

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List
 
 from app.explain.metric_analyzer import MetricSnapshot
 from app.explain.root_cause import RootCauseFinding
@@ -19,7 +18,7 @@ class Recommendation:
     supported: bool = True
 
 
-METRIC_RECOMMENDATION_BANK: Dict[str, List[Dict[str, object]]] = {
+METRIC_RECOMMENDATION_BANK: dict[str, list[dict[str, object]]] = {
     "shipping_cost": [
         {
             "test": lambda d: d is not None and d > 3,
@@ -174,14 +173,14 @@ class RecommendationEngine:
     def recommend(
         self,
         snapshot: MetricSnapshot,
-        findings: List[RootCauseFinding],
-    ) -> List[str]:
+        findings: list[RootCauseFinding],
+    ) -> list[str]:
         triggers = [f.evidence_metric for f in findings if f.weight >= 0.3]
         if snapshot.primary_metric not in triggers:
             triggers.insert(0, snapshot.primary_metric)
 
         seen: set = set()
-        recs: List[Recommendation] = []
+        recs: list[Recommendation] = []
 
         for metric in triggers:
             deltas = snapshot.deltas_pct or {}

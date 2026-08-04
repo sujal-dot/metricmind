@@ -1,7 +1,7 @@
 """Detect structured analytics intent from natural language questions."""
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -11,14 +11,14 @@ logger = logging.getLogger("metricmind.semantic.intent")
 class UserIntent(BaseModel):
     """Logical analytics intent, independent from Cube member names."""
 
-    metrics: List[str] = Field(default_factory=list)
-    dimensions: List[str] = Field(default_factory=list)
-    time_period: Optional[Dict[str, Any]] = None
-    filters: Dict[str, Any] = Field(default_factory=dict)
-    ordering: Optional[Dict[str, str]] = None
-    limit: Optional[int] = None
-    granularity: Optional[str] = None
-    comparison: Optional[str] = None
+    metrics: list[str] = Field(default_factory=list)
+    dimensions: list[str] = Field(default_factory=list)
+    time_period: dict[str, Any] | None = None
+    filters: dict[str, Any] = Field(default_factory=dict)
+    ordering: dict[str, str] | None = None
+    limit: int | None = None
+    granularity: str | None = None
+    comparison: str | None = None
 
 
 class IntentDetector:
@@ -206,15 +206,15 @@ class IntentDetector:
                 return metric
         return "revenue"
 
-    def _detect_dimensions(self, question: str) -> List[str]:
-        dimensions: List[str] = []
+    def _detect_dimensions(self, question: str) -> list[str]:
+        dimensions: list[str] = []
         for phrase, dimension in self.DIMENSION_PATTERNS:
             if phrase in question and dimension not in dimensions:
                 dimensions.append(dimension)
         return dimensions
 
-    def _detect_time_period(self, question: str) -> Optional[Dict[str, Any]]:
-        time_period: Dict[str, Any] = {}
+    def _detect_time_period(self, question: str) -> dict[str, Any] | None:
+        time_period: dict[str, Any] = {}
         year_match = re.search(r"\b(20\d{2})\b", question)
         if year_match:
             time_period["year"] = int(year_match.group(1))
@@ -235,7 +235,7 @@ class IntentDetector:
 
         return time_period or None
 
-    def _detect_granularity(self, question: str, dimensions: List[str]) -> Optional[str]:
+    def _detect_granularity(self, question: str, dimensions: list[str]) -> str | None:
         for phrase, granularity in self.GRANULARITY_PATTERNS:
             if phrase in question:
                 return granularity
@@ -247,14 +247,14 @@ class IntentDetector:
             return dimensions[0]
         return None
 
-    def _detect_ordering(self, question: str, metric: str) -> Optional[Dict[str, str]]:
+    def _detect_ordering(self, question: str, metric: str) -> dict[str, str] | None:
         if any(term in question for term in ("top", "highest", "largest", "best", "most")):
             return {"field": metric, "direction": "desc"}
         if any(term in question for term in ("bottom", "lowest", "smallest", "least")):
             return {"field": metric, "direction": "asc"}
         return None
 
-    def _detect_limit(self, question: str) -> Optional[int]:
+    def _detect_limit(self, question: str) -> int | None:
         explicit = re.search(r"\btop\s+(\d{1,3})\b", question)
         if explicit:
             return int(explicit.group(1))
@@ -265,7 +265,7 @@ class IntentDetector:
             return 10
         return None
 
-    def _detect_comparison(self, question: str) -> Optional[str]:
+    def _detect_comparison(self, question: str) -> str | None:
         if "compare" in question and "this month" in question and "last month" in question:
             return "month_over_month"
         return None

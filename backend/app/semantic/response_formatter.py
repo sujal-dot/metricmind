@@ -1,6 +1,6 @@
 """Format Cube.dev API responses for semantic explanation generation."""
 import logging
-from typing import Any, Dict, List
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -13,14 +13,14 @@ class FormattedResult(BaseModel):
     summary: str
     row_count: int
     has_data: bool
-    data_points: List[Dict[str, Any]] = Field(default_factory=list)
-    key_insights: List[str] = Field(default_factory=list)
+    data_points: list[dict[str, Any]] = Field(default_factory=list)
+    key_insights: list[str] = Field(default_factory=list)
 
 
 class ResponseFormatter:
     """Normalize Cube responses and derive simple business observations."""
 
-    def format(self, cube_response: Dict[str, Any]) -> FormattedResult:
+    def format(self, cube_response: dict[str, Any]) -> FormattedResult:
         logger.info("Formatting Cube response for explanation step")
         data_points = self._extract_rows(cube_response)
         row_count = len(data_points)
@@ -41,7 +41,7 @@ class ResponseFormatter:
         logger.info("Formatted result summary: %s", result.summary)
         return result
 
-    def _extract_rows(self, cube_response: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_rows(self, cube_response: dict[str, Any]) -> list[dict[str, Any]]:
         if isinstance(cube_response.get("data"), list):
             return cube_response["data"]
 
@@ -52,7 +52,7 @@ class ResponseFormatter:
 
         return []
 
-    def _extract_insights(self, data_points: List[Dict[str, Any]]) -> List[str]:
+    def _extract_insights(self, data_points: list[dict[str, Any]]) -> list[str]:
         if not data_points:
             return ["No data was available for the requested query."]
 

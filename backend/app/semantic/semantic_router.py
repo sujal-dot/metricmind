@@ -1,17 +1,17 @@
 """Orchestrate the semantic search and natural language analytics pipeline."""
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.semantic.intent_detector import IntentDetector, UserIntent
-from app.semantic.query_parser import QueryParser
-from app.semantic.response_formatter import FormattedResult, ResponseFormatter
 from app.agents.cube_client import CubeClient
 from app.agents.llm_factory import LLMFactory
 from app.config.settings import settings
+from app.semantic.intent_detector import IntentDetector, UserIntent
+from app.semantic.query_parser import QueryParser
+from app.semantic.response_formatter import FormattedResult, ResponseFormatter
 
 logger = logging.getLogger("metricmind.semantic.router")
 
@@ -40,7 +40,7 @@ class SemanticRouter:
 
     def __init__(
         self,
-        llm_provider: Optional[str] = None,
+        llm_provider: str | None = None,
         llm: BaseChatModel | Any = None,
         cube_client: CubeClient | Any = None,
         intent_detector: IntentDetector | None = None,
@@ -55,7 +55,7 @@ class SemanticRouter:
         self.cube_client = cube_client or CubeClient()
         logger.info("SemanticRouter initialized with %s as LLM provider", self.provider)
 
-    async def process(self, question: str) -> Dict[str, Any]:
+    async def process(self, question: str) -> dict[str, Any]:
         """Execute the semantic search pipeline."""
         start_time = time.perf_counter()
         question = question.strip()
@@ -63,7 +63,7 @@ class SemanticRouter:
             raise ValueError("Invalid user request: question cannot be empty")
 
         logger.info("Starting pipeline for question: %s", question)
-        results: Dict[str, Any] = {"question": question, "provider": self.provider}
+        results: dict[str, Any] = {"question": question, "provider": self.provider}
 
         try:
             intent: UserIntent = self.intent_detector.detect(question)
@@ -97,7 +97,7 @@ class SemanticRouter:
 
         return results
 
-    def _validate_cube_response(self, cube_response: Dict[str, Any]) -> None:
+    def _validate_cube_response(self, cube_response: dict[str, Any]) -> None:
         if not isinstance(cube_response, dict):
             raise ValueError("Invalid Cube API response: expected JSON object")
         if "error" in cube_response:

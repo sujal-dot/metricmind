@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import httpx
 
@@ -9,7 +9,7 @@ logger = logging.getLogger("metricmind.agents.cube_client")
 
 
 class CubeClient:
-    def __init__(self, api_url: Optional[str] = None, api_token: Optional[str] = None):
+    def __init__(self, api_url: str | None = None, api_token: str | None = None):
         self.api_url = (api_url or settings.cube_api_url).rstrip("/")
         self.api_token = api_token or settings.cube_api_token
         self.headers = {"Content-Type": "application/json"}
@@ -21,8 +21,8 @@ class CubeClient:
         method: str,
         path: str,
         *,
-        json_body: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        json_body: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         url = f"{self.api_url}/{path.lstrip('/')}"
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -53,7 +53,7 @@ class CubeClient:
             raise RuntimeError("Cube.dev returned an invalid response") from exc
 
     @staticmethod
-    def _normalize_query(query: Dict[str, Any]) -> Dict[str, Any]:
+    def _normalize_query(query: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(query, dict):
             return query
         q = dict(query)
@@ -89,14 +89,14 @@ class CubeClient:
             q["timeDimensions"] = normalized_tds
         return q
 
-    async def load(self, query: Dict[str, Any]) -> Dict[str, Any]:
+    async def load(self, query: dict[str, Any]) -> dict[str, Any]:
         normalized_query = self._normalize_query(query)
         logger.info("Sending Cube.dev load query: %s", normalized_query)
         result = await self._request("POST", "load", json_body={"query": normalized_query})
         logger.info("Received Cube.dev load response with keys: %s", list(result.keys()))
         return result
 
-    async def meta(self) -> Dict[str, Any]:
+    async def meta(self) -> dict[str, Any]:
         logger.info("Fetching metadata from Cube.dev")
         result = await self._request("GET", "meta")
         logger.info("Successfully retrieved Cube.dev metadata")

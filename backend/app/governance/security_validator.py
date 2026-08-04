@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import List, Optional
 
-from app.governance import sql_detector as _sql
 from app.governance import expensive_query_detector as _eq
+from app.governance import sql_detector as _sql
 from app.governance.prompts import (
     CUBE_ONLY_POLICY_MESSAGE,
     EXPENSIVE_QUERY_SUGGESTION_MESSAGE,
@@ -19,11 +18,11 @@ class SecurityDecision:
 
     question: str
     allowed: bool
-    block_reason: Optional[str] = None
-    block_code: Optional[str] = None  # "sql_injection" / "sql_request" / "expensive"
-    sql_result: Optional[_sql.SQLDetectionResult] = None
-    expensive_result: Optional[_eq.ExpensiveQueryResult] = None
-    suggested_filters: List[str] = field(default_factory=list)
+    block_reason: str | None = None
+    block_code: str | None = None  # "sql_injection" / "sql_request" / "expensive"
+    sql_result: _sql.SQLDetectionResult | None = None
+    expensive_result: _eq.ExpensiveQueryResult | None = None
+    suggested_filters: list[str] = field(default_factory=list)
 
     @property
     def human_message(self) -> str:
