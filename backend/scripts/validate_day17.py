@@ -254,7 +254,7 @@ def explain_results_tests() -> list[TestResult]:
     def _evidence_test():
         hints = {"region": "Europe", "primary_metric": "margin", "direction_hint": "down"}
         try:
-            summary, reasons, confidence, confidence_breakdown, recs, _ = analyzer.analyze(hints)
+            summary, reasons, confidence, confidence_breakdown, recs, _ = analyzer.analyze_sync(hints)
         except Exception as exc:  # noqa: BLE001
             return False, f"analyze raised: {type(exc).__name__}: {exc}"
         d = f"confidence={confidence}; reasons={len(reasons)}; recs={len(recs[:5])}"
