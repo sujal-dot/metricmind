@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS fact_sales (
     quantity INT NOT NULL,
     discount NUMERIC(10, 4),
     profit_amount NUMERIC(18, 4),
+    ship_mode VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_customer FOREIGN KEY (customer_key) REFERENCES dim_customer(customer_key),

@@ -12,6 +12,8 @@ export interface AnalyticsFilters {
   date_to?: string;
   region?: string;
   category?: string;
+  segment?: string;
+  ship_mode?: string;
   [key: string]: string | undefined;
 }
 

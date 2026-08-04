@@ -16,6 +16,8 @@ async def get_analytics_charts(
     date_to: date | None = Query(default=None),
     region: str | None = Query(default=None),
     category: str | None = Query(default=None),
+    segment: str | None = Query(default=None),
+    ship_mode: str | None = Query(default=None),
 ) -> AnalyticsChartsResponse:
     service = AnalyticsService()
     data = await service.get_charts(
@@ -23,5 +25,7 @@ async def get_analytics_charts(
         date_to=date_to,
         region=region,
         category=category,
+        segment=segment,
+        ship_mode=ship_mode,
     )
     return AnalyticsChartsResponse(**data)

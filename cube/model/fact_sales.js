@@ -114,6 +114,11 @@ cube(`FactSales`, {
     createdAt: {
       sql: `created_at`,
       type: `time`
+    },
+
+    shipMode: {
+      sql: `ship_mode`,
+      type: `string`
     }
   },
   

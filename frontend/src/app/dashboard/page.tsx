@@ -50,6 +50,8 @@ export default function DashboardPage() {
     const f: AnalyticsFilters = {};
     if (regionFilter) f.region = regionFilter;
     if (categoryFilter) f.category = categoryFilter;
+    if (segmentFilter) f.segment = segmentFilter;
+    if (shipModeFilter) f.ship_mode = shipModeFilter;
 
     // Date range mappings
     if (dateRange === 'Last 30 Days') {

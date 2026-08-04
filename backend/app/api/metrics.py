@@ -17,6 +17,8 @@ async def get_metrics(
     date_to: date | None = Query(default=None),
     region: str | None = Query(default=None),
     category: str | None = Query(default=None),
+    segment: str | None = Query(default=None),
+    ship_mode: str | None = Query(default=None),
 ) -> MetricsResponse:
     service = MetricsService()
     data = await service.get_metrics(
@@ -24,6 +26,8 @@ async def get_metrics(
         date_to=date_to,
         region=region,
         category=category,
+        segment=segment,
+        ship_mode=ship_mode,
     )
 
     prior_raw = data.pop("_prior", None)

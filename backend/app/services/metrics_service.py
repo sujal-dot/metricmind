@@ -25,6 +25,8 @@ class MetricsService:
         date_to: date | None = None,
         region: str | None = None,
         category: str | None = None,
+        segment: str | None = None,
+        ship_mode: str | None = None,
     ) -> dict:
         measures = [
             "FactSales.revenue",
@@ -35,7 +37,7 @@ class MetricsService:
             "FactSales.margin",
         ]
 
-        filters = self._build_filters(region=region, category=category)
+        filters = self._build_filters(region=region, category=category, segment=segment, ship_mode=ship_mode)
         time_dimensions = self._build_time_dimensions(date_from=date_from, date_to=date_to)
 
         query = {
@@ -79,7 +81,12 @@ class MetricsService:
         return current
 
     @staticmethod
-    def _build_filters(region: str | None, category: str | None) -> list[dict]:
+    def _build_filters(
+        region: str | None,
+        category: str | None,
+        segment: str | None = None,
+        ship_mode: str | None = None,
+    ) -> list[dict]:
         filters = []
         if region:
             filters.append({
@@ -92,6 +99,18 @@ class MetricsService:
                 "member": "DimProduct.category",
                 "operator": "equals",
                 "values": [category],
+            })
+        if segment:
+            filters.append({
+                "member": "DimCustomer.segment",
+                "operator": "equals",
+                "values": [segment],
+            })
+        if ship_mode:
+            filters.append({
+                "member": "FactSales.shipMode",
+                "operator": "equals",
+                "values": [ship_mode],
             })
         return filters
 
