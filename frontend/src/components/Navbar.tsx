@@ -1,11 +1,22 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useMobileNav } from '@/providers/MobileNavProvider';
 import { useAuth } from '@/providers/AuthProvider';
+
+const routeTitles: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/chat': 'AI Chat',
+  '/analytics': 'Analytics',
+  '/history': 'History',
+};
 
 export default function Navbar() {
   const { isOpen, toggle } = useMobileNav();
   const { user, logout } = useAuth();
+  const pathname = usePathname();
+
+  const title = routeTitles[pathname] || (pathname?.startsWith('/chat') ? 'AI Chat' : 'Dashboard');
 
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -52,7 +63,7 @@ export default function Navbar() {
             </svg>
           )}
         </button>
-        <h2 className="text-lg font-semibold text-gray-900">Dashboard</h2>
+        <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
       </div>
       <div className="flex items-center gap-4">
         {user && (
