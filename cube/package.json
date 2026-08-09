@@ -11,6 +11,6 @@
     "@cubejs-backend/server": "^0.34.62"
   },
   "devDependencies": {
-    "axios": "^1.7.9"
+    "axios": "^1.19.0"
   }
 }
